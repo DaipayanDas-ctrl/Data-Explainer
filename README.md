@@ -28,6 +28,49 @@ This architecture ensures:
 
 ---
 
+## 🏗️ Architecture
+
+```
+                               ┌─────────────────────────────────────────┐
+                               │           BROWSER ENVIRONMENT           │
+                               │                                         │
+ ┌──────────────┐              │  ┌───────────────┐   ┌───────────────┐  │
+ │  User CSV    │ ───────────► │  │ CSV Parser    │   │ PII Redaction │  │
+ └──────────────┘              │  │ (PapaParse)   │ ─►│ (Regex/Rules) │  │
+                               │  └───────────────┘   └───────┬───────┘  │
+                               │                              │          │
+                               │  ┌───────────────┐   ┌───────▼───────┐  │
+                               │  │ Visualization │   │ Stats Engine  │  │
+                               │  │ (Chart.js)    │◄──│ Math & Models │  │
+                               │  └───────────────┘   └───────┬───────┘  │
+                               └──────────────────────────────┼──────────┘
+                                                              │
+                                            ONLY COMPUTED STATS (JSON)
+                                            NO RAW ROWS OR PII
+                                                              │
+                                                              ▼
+                               ┌─────────────────────────────────────────┐
+                               │             FASTAPI BACKEND             │
+                               │                                         │
+                               │   ┌──────────────┐   ┌──────────────┐   │
+                               │   │ Rate Limiter │   │ Auth Guard   │   │
+                               │   │ (SlowAPI)    │   │ (API Key/JWT)│   │
+                               │   └──────┬───────┘   └──────┬───────┘   │
+                               │          └──────────┬───────┘           │
+                               │                     ▼                   │
+                               │          ┌─────────────────────┐        │
+                               │          │  LLM Provider Proxy │        │
+                               │          └──────────┬──────────┘        │
+                               └─────────────────────┼───────────────────┘
+                                                     │
+                                                     ▼
+                               ┌─────────────────────────────────────────┐
+                               │           LLM PROVIDER APIS             │
+                               │  Anthropic Claude / Groq Llama 3        │
+                               └─────────────────────────────────────────┘
+```
+
+
 # ✨ Features
 
 ## 📂 Smart Data Upload
@@ -133,29 +176,6 @@ Export analysis as
 - PowerPoint
 - Charts
 - CSV
-
----
-
-# 🏗 Architecture
-
-```
-                Upload Dataset
-                      │
-                      ▼
-         Data Validation & Cleaning
-                      │
-                      ▼
-          DuckDB / Pandas Processing
-                      │
-                      ▼
-      Statistical Analysis Engine
-                      │
-                      ▼
-      AI Insight Generation Layer
-                      │
-                      ▼
-      Interactive Dashboard & Charts
-```
 
 ---
 
