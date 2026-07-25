@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Explainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --ink:#10141F; --ink-soft:#171C2B; --ink-softer:#1E2436;
+  --paper:#F6F4EE; --paper-dim:#EDEAE1;
+  --amber:#E8A33D; --amber-dim:#4A3A20;
+  --teal:#2F6F68; --teal-dim:#173330;
+  --coral:#D6584B; --coral-dim:#3A211D;
+  --slate:#8792A6; --line:rgba(246,244,238,0.11); --line-strong:rgba(246,244,238,0.2);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--ink); color:var(--paper);
+  font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+::selection{background:var(--amber); color:var(--ink);}
+h1,h2,h3,.display{font-family:'Fraunces',serif; font-weight:500; letter-spacing:-0.01em;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+a{color:inherit;}
+:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:40;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 28px; border-bottom:1px solid var(--line);
+  background:rgba(16,20,31,0.88); backdrop-filter:blur(10px);
+}
+.wordmark{font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:0.18em; text-transform:uppercase; color:var(--paper); display:flex; align-items:center; gap:10px;}
+.wordmark .dot{width:7px;height:7px;border-radius:50%; background:var(--slate);}
+.wordmark .dot.live{background:var(--amber); box-shadow:0 0 0 3px rgba(232,163,61,0.18);}
+.topbar-right{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--slate); display:flex; gap:18px; align-items:center;}
+.pill{border:1px solid var(--line-strong); border-radius:100px; padding:4px 11px; font-size:11px; letter-spacing:0.03em;}
+
+/* ---------- hero / upload ---------- */
+.hero{
+  max-width:900px; margin:0 auto; padding:88px 24px 60px; text-align:left;
+}
+.hero .eyebrow{font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.16em; color:var(--amber); text-transform:uppercase; margin-bottom:18px;}
+.hero h1{font-size:clamp(36px,6vw,58px); line-height:1.04; margin:0 0 20px; max-width:11ch;}
+.hero p.lede{font-size:17px; line-height:1.6; color:#C9CDD9; max-width:56ch; margin:0 0 40px;}
+
+.dropzone{
+  border:1px solid var(--line-strong); border-radius:6px; background:var(--ink-soft);
+  padding:36px; display:flex; align-items:center; gap:24px; cursor:pointer;
+  transition:border-color .18s ease, background .18s ease;
+}
+.dropzone:hover, .dropzone.drag{border-color:var(--amber); background:var(--ink-softer);}
+.dropzone .icon{
+  width:46px;height:46px;flex:0 0 46px;border-radius:4px;border:1px solid var(--line-strong);
+  display:flex;align-items:center;justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--slate);
+}
+.dropzone .txt strong{display:block; font-size:15px; margin-bottom:4px;}
+.dropzone .txt span{font-size:13px; color:var(--slate);}
+.dz-formats{margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--slate); letter-spacing:0.03em;}
+input[type=file]{display:none;}
+
+.mvp-note{
+  margin-top:48px; padding-top:28px; border-top:1px solid var(--line); font-size:13px; color:var(--slate); line-height:1.65; max-width:60ch;
+}
+.mvp-note b{color:#C9CDD9; font-weight:500;}
+
+/* ---------- app shell ---------- */
+.shell{display:none; }
+.shell.active{display:grid; grid-template-columns:220px 1fr; min-height:calc(100vh - 53px);}
+.rail{border-right:1px solid var(--line); padding:22px 0; position:sticky; top:53px; align-self:start; height:calc(100vh - 53px); overflow-y:auto;}
+.rail-section{padding:0 18px; margin-bottom:22px;}
+.rail-label{font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--slate); margin-bottom:8px; padding:0 4px;}
+.rail-item{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:9px 10px; border-radius:4px; font-size:13.5px; cursor:pointer; color:#C9CDD9;
+  border:1px solid transparent; margin-bottom:2px;
+}
+.rail-item:hover{background:var(--ink-soft);}
+.rail-item.active{background:var(--ink-soft); border-color:var(--line-strong); color:var(--paper);}
+.rail-item .count{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--slate); background:var(--ink-softer); padding:1px 6px; border-radius:100px;}
+.rail-item .count.warn{color:var(--coral); }
+.rail-item .count.ok{color:var(--teal);}
+
+.main{padding:32px 40px 100px; max-width:1180px;}
+.panel{display:none;}
+.panel.active{display:block; animation:fadein .25s ease;}
+@keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+
+.panel-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:12px;}
+.panel-head h2{font-size:26px; margin:0;}
+.panel-head .sub{font-size:13px; color:var(--slate); margin-top:4px; font-family:'IBM Plex Mono',monospace;}
+
+.grid{display:grid; gap:16px;}
+.g2{grid-template-columns:1fr 1fr;}
+.g3{grid-template-columns:repeat(3,1fr);}
+.g4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr;}}
+
+.card{background:var(--ink-soft); border:1px solid var(--line); border-radius:6px; padding:20px;}
+.stat-card .num{font-family:'IBM Plex Mono',monospace; font-size:28px; color:var(--paper); margin:6px 0 2px;}
+.stat-card .lbl{font-size:11.5px; color:var(--slate); text-transform:uppercase; letter-spacing:0.08em;}
+
+/* schema table */
+table{width:100%; border-collapse:collapse; font-size:13px;}
+th{text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--slate); padding:9px 12px; border-bottom:1px solid var(--line-strong); font-weight:400;}
+td{padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.mono-cell{font-family:'IBM Plex Mono',monospace; font-size:12px; color:#C9CDD9;}
+.badge{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; padding:2px 7px; border-radius:3px; letter-spacing:0.03em;}
+.badge.numeric{background:var(--teal-dim); color:#7FCFC3;}
+.badge.text{background:var(--ink-softer); color:var(--slate);}
+.badge.date{background:var(--amber-dim); color:var(--amber);}
+
+/* quality flags */
+.flag{display:flex; gap:14px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--line);}
+.flag:last-child{border-bottom:none;}
+.flag .sev{width:8px;height:8px;border-radius:50%; margin-top:6px; flex:0 0 8px;}
+.sev.high{background:var(--coral);} .sev.med{background:var(--amber);} .sev.low{background:var(--slate);}
+.flag .body strong{display:block; font-size:14px; margin-bottom:2px;}
+.flag .body span{font-size:12.5px; color:var(--slate);}
+.empty-state{padding:40px 20px; text-align:center; color:var(--slate); font-size:13.5px;}
+.empty-state .ico{font-family:'IBM Plex Mono',monospace; font-size:22px; color:var(--teal); margin-bottom:10px;}
+
+/* insight ledger cards -- signature element */
+.insight{background:var(--ink-soft); border:1px solid var(--line); border-radius:6px; padding:22px 22px 18px; margin-bottom:14px; position:relative;}
+.insight-top{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:10px;}
+.insight h3{font-size:17px; margin:0; line-height:1.35; font-weight:500;}
+.conf{display:flex; align-items:center; gap:6px; flex:0 0 auto; font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--slate); white-space:nowrap;}
+.conf-bar{width:38px; height:5px; border-radius:3px; background:var(--ink-softer); overflow:hidden;}
+.conf-bar i{display:block; height:100%; background:var(--teal);}
+.conf.low .conf-bar i{background:var(--coral);}
+.conf.med .conf-bar i{background:var(--amber);}
+.ledger{
+  margin-top:14px; padding-top:12px; border-top:1px dashed var(--line-strong);
+  display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--slate);
+}
+.ledger::before{content:"⌁"; color:var(--amber);}
+.ledger .chip{background:var(--ink-softer); border:1px solid var(--line-strong); border-radius:3px; padding:3px 8px; color:#B7DED8;}
+.cols-touched{margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;}
+.col-tag{font-size:10.5px; font-family:'IBM Plex Mono',monospace; color:var(--slate); border:1px solid var(--line); padding:2px 7px; border-radius:100px;}
+
+/* charts */
+.chart-wrap{background:var(--ink-soft); border:1px solid var(--line); border-radius:6px; padding:20px;}
+.chart-wrap h3{font-size:14.5px; margin:0 0 3px; font-weight:500;}
+.chart-wrap .reason{font-size:12px; color:var(--slate); margin-bottom:14px;}
+.chart-canvas-holder{position:relative; height:260px; width:100%; box-sizing:border-box; padding:6px;}
+.chart-canvas-holder canvas{position:absolute; top:6px; left:6px; width:calc(100% - 12px) !important; height:calc(100% - 12px) !important;}
+
+.btn{
+  font-family:'Inter',sans-serif; font-weight:600; font-size:13px; border:1px solid var(--line-strong);
+  background:var(--ink-soft); color:var(--paper); padding:10px 18px; border-radius:5px; cursor:pointer;
+  transition:border-color .15s ease, background .15s ease;
+}
+.btn:hover{border-color:var(--amber);}
+.btn.primary{background:var(--amber); color:var(--ink); border-color:var(--amber);}
+.btn.primary:hover{background:#f0b45c;}
+.btn:disabled{opacity:0.4; cursor:not-allowed;}
+.btn.small{padding:7px 12px; font-size:12px;}
+
+.audit-row{font-family:'IBM Plex Mono',monospace; font-size:11.5px;}
+.diff-callout{background:var(--teal-dim); border:1px solid rgba(127,207,195,0.25); border-radius:6px; padding:16px 20px; margin-bottom:20px; font-size:13.5px; color:#B7DED8;}
+
+.spinner{width:14px;height:14px;border-radius:50%; border:2px solid var(--line-strong); border-top-color:var(--amber); animation:spin .7s linear infinite; display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-line{display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--slate); padding:20px 0;}
+
+.overlay{
+  display:none; position:fixed; inset:0; z-index:100; background:rgba(10,12,18,0.72); backdrop-filter:blur(3px);
+  align-items:flex-start; justify-content:center; padding:40px 20px; overflow-y:auto;
+}
+.overlay.active{display:flex;}
+.report-sheet{
+  background:var(--paper); color:#1A1D26; width:100%; max-width:820px; border-radius:8px;
+  padding:44px 48px 56px; font-family:'Inter',sans-serif; position:relative;
+}
+.report-sheet h1{font-family:'Fraunces',serif; font-size:30px; margin:0 0 4px; color:#10141F;}
+.report-sheet .report-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#6B7280; margin-bottom:28px;}
+.report-sheet h2{font-family:'Fraunces',serif; font-size:18px; margin:30px 0 12px; color:#10141F; border-bottom:1px solid #E0DDD3; padding-bottom:8px;}
+.report-sheet p{font-size:13.5px; line-height:1.6; color:#2A2E38; margin:0 0 8px;}
+.report-sheet table{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px;}
+.report-sheet th{text-align:left; padding:6px 10px; border-bottom:1px solid #C9C4B5; font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; color:#6B7280;}
+.report-sheet td{padding:6px 10px; border-bottom:1px solid #EDEAE1; font-family:'IBM Plex Mono',monospace; font-size:12px;}
+.report-sheet .r-flag{font-size:13px; padding:5px 0; color:#2A2E38;}
+.report-sheet .r-chip{font-family:'IBM Plex Mono',monospace; font-size:11px; background:#EDEAE1; padding:2px 7px; border-radius:3px; color:#3A4048;}
+.overlay-toolbar{position:sticky; top:0; display:flex; justify-content:flex-end; gap:10px; padding:14px 0; margin:-40px 0 6px; z-index:2;}
+.overlay-toolbar .btn{background:var(--ink-soft); color:var(--paper);}
+@media (max-width:640px){ .report-sheet{padding:28px 20px;} }
+
+/* ---------- chat panel ---------- */
+#panel-chat{ display:none; flex-direction:column; height:calc(100vh - 53px - 64px); }
+#panel-chat.active{ display:flex; animation:fadein .25s ease; }
+.chat-feed{
+  flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+  padding-bottom:8px;
+}
+.chat-msg{ display:flex; gap:12px; align-items:flex-start; }
+.chat-msg.user{ flex-direction:row-reverse; }
+.chat-avatar{
+  width:30px; height:30px; border-radius:50%; flex:0 0 30px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+}
+.chat-avatar.ai{ background:var(--teal-dim); color:#7FCFC3; }
+.chat-avatar.user{ background:var(--amber-dim); color:var(--amber); }
+.chat-bubble{
+  max-width:72%; padding:12px 16px; border-radius:8px; font-size:13.5px; line-height:1.65;
+  border:1px solid var(--line);
+}
+.chat-msg.ai .chat-bubble{ background:var(--ink-soft); border-radius:2px 8px 8px 8px; }
+.chat-msg.user .chat-bubble{ background:var(--ink-softer); border-radius:8px 2px 8px 8px; color:#E8EAF0; }
+.chat-bubble.thinking{ color:var(--slate); font-style:italic; }
+.chat-input-row{
+  display:flex; gap:10px; padding-top:14px;
+  border-top:1px solid var(--line);
+  flex:0 0 auto;
+}
+#chatInput{
+  flex:1; background:var(--ink-soft); border:1px solid var(--line-strong); border-radius:5px;
+  color:var(--paper); font-family:'Inter',sans-serif; font-size:13.5px;
+  padding:10px 14px; resize:none; outline:none; min-height:44px; max-height:120px;
+  transition:border-color .15s;
+}
+#chatInput:focus{ border-color:var(--amber); }
+#chatInput::placeholder{ color:var(--slate); }
+.chat-tip{
+  font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--slate);
+  margin-bottom:14px; padding:10px 14px;
+  background:var(--ink-softer); border-radius:5px; border:1px solid var(--line);
+}
+.chat-suggestions{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.chat-suggestion{
+  font-size:12px; font-family:'IBM Plex Mono',monospace;
+  border:1px solid var(--line-strong); border-radius:100px;
+  padding:5px 13px; cursor:pointer; color:#C9CDD9;
+  transition:border-color .15s, color .15s;
+  background:var(--ink-soft);
+}
+.chat-suggestion:hover{ border-color:var(--amber); color:var(--amber); }
+</style>
+</head>
+<body>
+
+<div class="overlay" id="reportOverlay">
+  <div style="width:100%; max-width:820px;">
+    <div class="overlay-toolbar">
+      <button class="btn small" id="copyReportBtn">Copy as text</button>
+      <button class="btn small primary" id="downloadReportBtn">Download .html</button>
+      <button class="btn small" id="closeReportBtn">Close</button>
+    </div>
+    <div class="report-sheet" id="reportSheet"></div>
+  </div>
+</div>
+
+
+<div class="topbar">
+  <div class="wordmark"><span class="dot" id="statusDot"></span> Data Explainer</div>
+  <div class="topbar-right">
+    <span class="pill" id="fileNamePill" style="display:none;"></span>
+    <span class="pill" style="border-color:var(--teal); color:#7FCFC3;">✓ Verified Original Data (0% Fabricated)</span>
+    <span id="tokenNote">hybrid engine · pandas-equivalent stats local, LLM narrates only</span>
+  </div>
+</div>
+
+<!-- HERO / UPLOAD -->
+<div class="hero" id="heroView">
+  <div class="eyebrow">Insights Pipeline · Full Platform</div>
+  <h1>Every number, accounted for.</h1>
+  <p class="lede">Drop in a spreadsheet. The math runs locally and deterministically — nothing raw ever leaves your browser. Claude only reads the computed statistics and writes the plain-language explanation, and every claim it makes must point back to an exact figure.</p>
+
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload a CSV file">
+    <div class="icon mono">CSV</div>
+    <div class="txt">
+      <strong>Drop a file here, or click to browse</strong>
+      <span>Your data is parsed and profiled on this device before anything is sent anywhere.</span>
+    </div>
+    <input type="file" id="fileInput" accept=".csv,text/csv">
+  </div>
+  <div class="dz-formats">ACCEPTS · .CSV &nbsp;·&nbsp; MAX ~200K ROWS IN-BROWSER &nbsp;·&nbsp; NOTHING UPLOADED TO A SERVER</div>
+
+  <div class="mvp-note">
+    <b>What's real here:</b> PII scrubbing, data-quality checks, schema profiling, z-score/IQR anomaly detection, correlation detection, trend forecasting, and grounding validation all run as genuine deterministic code in your browser — the same responsibilities Section 5 of the PRD assigns to Pandas/DuckDB. Your local FastAPI backend holds the real Anthropic API key and only ever receives the computed statistics below, never your raw rows; every insight it writes is checked against those statistics before being shown to you. Dataset versioning persists in this browser's localStorage.
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div class="shell" id="shell">
+  <div class="rail">
+    <div class="rail-section">
+      <div class="rail-label">Session</div>
+      <div class="rail-item active" data-panel="overview">Overview <span class="count" id="navRows">–</span></div>
+      <div class="rail-item" data-panel="quality">Data Quality <span class="count" id="navQuality">0</span></div>
+    </div>
+    <div class="rail-section">
+      <div class="rail-label">Analysis</div>
+      <div class="rail-item" data-panel="insights">Insights <span class="count" id="navInsights">0</span></div>
+      <div class="rail-item" data-panel="charts">Charts <span class="count" id="navCharts">0</span></div>
+      <div class="rail-item" data-panel="anomalies">Anomalies <span class="count" id="navAnomalies">0</span></div>
+      <div class="rail-item" data-panel="correlations">Correlations <span class="count" id="navCorr">0</span></div>
+      <div class="rail-item" data-panel="forecast">Forecast</div>
+    </div>
+    <div class="rail-section">
+      <div class="rail-label">Assistant</div>
+      <div class="rail-item" id="chatNavItem" data-panel="chat">Chat <span class="count" id="navChat">0</span></div>
+    </div>
+    <div class="rail-section">
+      <div class="rail-label">Continuity</div>
+      <div class="rail-item" data-panel="versions">Version Diff <span class="count" id="navDiff">–</span></div>
+      <div class="rail-item" data-panel="audit">Audit Log <span class="count" id="navAudit">0</span></div>
+    </div>
+    <div class="rail-section">
+      <button class="btn small" id="exportBtn" style="width:100%;">Export report (PDF)</button>
+      <button class="btn small" id="newFileBtn" style="width:100%; margin-top:8px;">Upload new file</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <div class="panel active" id="panel-overview">
+      <div class="panel-head"><div><h2>Overview</h2><div class="sub" id="overviewSub"></div></div></div>
+      <div class="grid g4" id="statCards"></div>
+      <div style="margin-top:28px;">
+        <h3 style="font-size:16px; margin-bottom:12px;">Schema</h3>
+        <div class="card" style="padding:0; overflow-x:auto;">
+          <table id="schemaTable"><thead><tr><th>Column</th><th>Type</th><th>Nulls</th><th>Unique</th><th>Summary</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div style="margin-top:28px;">
+        <h3 style="font-size:16px; margin-bottom:12px;">PII Scrubbing</h3>
+        <div class="card" id="piiCard"></div>
+      </div>
+    </div>
+
+    <!-- QUALITY -->
+    <div class="panel" id="panel-quality">
+      <div class="panel-head"><div><h2>Data Quality</h2><div class="sub">Checked before any insight is generated</div></div></div>
+      <div class="card" id="qualityList"></div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="panel" id="panel-insights">
+      <div class="panel-head">
+        <div><h2>Insights</h2><div class="sub">Grounded to a computed statistic — nothing here is guessed</div></div>
+        <button class="btn primary" id="genInsightsBtn">Generate insights</button>
+      </div>
+      <div id="insightsList"></div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="panel" id="panel-charts">
+      <div class="panel-head"><div><h2>Charts</h2><div class="sub">Selected by the model, drawn only from verified local data</div></div></div>
+      <div class="grid g2" id="chartsGrid"></div>
+    </div>
+
+    <!-- ANOMALIES -->
+    <div class="panel" id="panel-anomalies">
+      <div class="panel-head"><div><h2>Anomalies &amp; Outliers</h2><div class="sub">z-score &gt; 3 or outside 1.5× IQR, computed per column</div></div></div>
+      <div id="anomaliesList"></div>
+    </div>
+
+    <!-- CORRELATIONS -->
+    <div class="panel" id="panel-correlations">
+      <div class="panel-head"><div><h2>Correlations</h2><div class="sub">Pearson r between numeric columns, |r| ≥ 0.6 shown</div></div></div>
+      <div id="corrList"></div>
+    </div>
+
+    <!-- FORECAST -->
+    <div class="panel" id="panel-forecast">
+      <div class="panel-head"><div><h2>Trend Forecast</h2><div class="sub">Simple exponential smoothing — explainable, not a guarantee</div></div></div>
+      <div id="forecastArea"></div>
+    </div>
+
+    <!-- VERSIONS -->
+    <div class="panel" id="panel-versions">
+      <div class="panel-head"><div><h2>Version Diff</h2><div class="sub">Compared against the last file uploaded with this name, in this browser</div></div></div>
+      <div id="diffArea"></div>
+    </div>
+
+    <!-- AUDIT -->
+    <div class="panel" id="panel-audit">
+      <div class="panel-head"><div><h2>Audit Log</h2><div class="sub">Every call sent externally, and every field redacted before it went</div></div></div>
+      <div class="card" style="padding:0; overflow-x:auto;">
+        <table id="auditTable"><thead><tr><th>Time</th><th>Event</th><th>Detail</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="panel" id="panel-chat">
+      <div class="panel-head" style="flex:0 0 auto;"><div><h2>Chat</h2><div class="sub">Ask anything about this file — answers are grounded in computed stats, not raw rows</div></div></div>
+      <div class="chat-tip" id="chatTip">Stats are computed locally and summarised before being sent. Raw rows are never shared with the LLM.</div>
+      <div class="chat-suggestions" id="chatSuggestions"></div>
+      <div class="chat-feed" id="chatFeed"></div>
+      <div class="chat-input-row">
+        <textarea id="chatInput" rows="1" placeholder="Ask a question about your data…"></textarea>
+        <button class="btn primary" id="chatSendBtn">Send</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================= PERSISTENCE ============================= */
+/* The original build used window.storage, an API the Claude.ai artifact
+   sandbox injects. Running standalone in a normal browser, that doesn't
+   exist — so this is a small shim over localStorage with the same
+   get/set/delete shape (the `shared` param is accepted for API compatibility
+   but ignored, since there's no multi-user backend here; everything is
+   local to this browser). */
+const storage = {
+  async get(key){
+    const raw = localStorage.getItem('de:'+key);
+    if(raw===null) return null;
+    return {key, value: raw};
+  },
+  async set(key, value){
+    localStorage.setItem('de:'+key, value);
+    return {key, value};
+  },
+  async delete(key){
+    localStorage.removeItem('de:'+key);
+    return {key, deleted:true};
+  }
+};
+
+/* ============================= STATE ============================= */
+/* ============================= CHART.JS LOADER =============================
+   The static <script> tag approach turned out to be fragile (one CDN URL,
+   one version — if it 404s or is blocked, window.Chart is just undefined
+   with no visible error until something tries to call `new Chart(...)`).
+   This tries several known-good CDN builds in order and resolves once one
+   actually defines window.Chart. Every chart-drawing call awaits this. */
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = ()=>resolve();
+    s.onerror = ()=>reject(new Error('failed to load '+src));
+    document.head.appendChild(s);
+  });
+}
+let _chartLoadPromise = null;
+function ensureChartJs(){
+  if(window.Chart) return Promise.resolve();
+  if(_chartLoadPromise) return _chartLoadPromise;
+  const candidates = [
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js',
+    'https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js'
+  ];
+  _chartLoadPromise = (async ()=>{
+    for(const url of candidates){
+      if(window.Chart) return;
+      try{ await loadScriptOnce(url); if(window.Chart) return; }catch(e){ /* try next candidate */ }
+    }
+    throw new Error('Chart.js failed to load from every known CDN source');
+  })();
+  return _chartLoadPromise;
+}
+ensureChartJs().catch(()=>{}); // start warming immediately, don't block page load
+
+const S = {
+  fileName:null, headers:[], rows:[], schema:{}, statsRegistry:{},
+  quality:[], anomalies:[], correlations:[], forecast:null,
+  insights:[], chartConfigs:[], auditLog:[], piiSummary:{redactedCount:0, byColumn:{}},
+};
+
+/* ============================= UTIL ============================= */
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function fmtNum(n){
+  if(n===null||n===undefined||isNaN(n)) return "–";
+  if(Math.abs(n)>=1000) return Number(n).toLocaleString(undefined,{maximumFractionDigits:1});
+  return Number(n.toFixed(3)).toString();
+}
+function nowStr(){return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function logAudit(event, detail){
+  S.auditLog.unshift({time:nowStr(), event, detail});
+  renderAudit();
+  try{ storage.set('audit-log', JSON.stringify(S.auditLog.slice(0,200))); }catch(e){}
+}
+
+/* ============================= PII SCRUBBER ============================= */
+const PII_PATTERNS = [
+  {name:'email', re:/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g},
+  {name:'ssn', re:/\b\d{3}-\d{2}-\d{4}\b/g},
+  {name:'credit_card', re:/\b(?:\d[ -]*?){13,16}\b/g},
+  {name:'phone', re:/\b(\+?\d{1,2}[ -]?)?\(?\d{3}\)?[ -]?\d{3}[ -]?\d{4}\b/g},
+];
+const PII_HEADER_HINTS = ['email','ssn','social','phone','mobile','credit','card','password','address','dob','birth'];
+
+function scrubValue(val, colName){
+  if(typeof val !== 'string' || !val) return {clean:val, hits:[]};
+  let hits=[]; let out = val;
+  for(const p of PII_PATTERNS){
+    if(p.re.test(out)){
+      p.re.lastIndex=0;
+      out = out.replace(p.re, `[REDACTED:${p.name.toUpperCase()}]`);
+      hits.push(p.name);
+    }
+  }
+  return {clean:out, hits};
+}
+
+function runPiiScrub(){
+  let redactedCount=0; const byColumn={};
+  S.headers.forEach(h=>{
+    const headerFlag = PII_HEADER_HINTS.some(k=>h.toLowerCase().includes(k));
+    let colHits=0;
+    S.rows.forEach(row=>{
+      const {clean, hits} = scrubValue(row[h], h);
+      if(hits.length){ row[h]=clean; redactedCount+=hits.length; colHits+=hits.length; }
+    });
+    if(colHits>0 || headerFlag) byColumn[h]={count:colHits, headerFlagged:headerFlag};
+  });
+  S.piiSummary = {redactedCount, byColumn};
+  if(redactedCount>0) logAudit('PII redaction', `${redactedCount} value(s) scrubbed across ${Object.keys(byColumn).length} column(s)`);
+}
+
+/* ============================= SCHEMA / STATS ============================= */
+/* Every numeric coercion in this file used to be its own
+   `Number(String(v).replace(/,/g,''))` — which only strips thousands commas.
+   Currency symbols ($, €, £), percent signs, accounting-style negatives like
+   "(1,234)", or stray whitespace all silently became NaN at whichever call
+   site hit them first, and got dropped inconsistently depending on which
+   function ran. Centralizing that here so every stat, chart, and query
+   parses numbers the same, correct way. */
+function toNum(v){
+  if(v===null || v===undefined) return NaN;
+  if(typeof v === 'number') return v;
+  let s = String(v).trim();
+  if(s==='') return NaN;
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1).trim(); }
+  if(/^-/.test(s)){ neg = true; }
+  s = s.replace(/[$€£¥,\s%+]/g,'');
+  if(s==='' || s==='-') return NaN;
+  const n = Number(s);
+  if(isNaN(n)) return NaN;
+  return neg ? -Math.abs(n) : n;
+}
+function inferType(colVals){
+  const nonNull = colVals.filter(v=>v!==null && v!==undefined && String(v).trim()!=='');
+  if(nonNull.length===0) return 'text';
+  let numCount=0, dateCount=0;
+  nonNull.slice(0,500).forEach(v=>{
+    const s=String(v).trim();
+    if(s!=='' && !isNaN(toNum(s))) numCount++;
+    else if(/^\d{4}-\d{1,2}-\d{1,2}/.test(s) || /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) dateCount++;
+  });
+  const n = Math.min(nonNull.length,500);
+  if(numCount/n > 0.9) return 'numeric';
+  if(dateCount/n > 0.7) return 'date';
+  return 'text';
+}
+function mean(a){return a.reduce((x,y)=>x+y,0)/a.length;}
+function median(a){const s=[...a].sort((x,y)=>x-y); const m=Math.floor(s.length/2); return s.length%2 ? s[m] : (s[m-1]+s[m])/2;}
+function stddev(a,m){return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-1||1));}
+function quartile(sorted,q){const pos=(sorted.length-1)*q; const base=Math.floor(pos); const rest=pos-base; return sorted[base+1]!==undefined ? sorted[base]+rest*(sorted[base+1]-sorted[base]) : sorted[base];}
+
+function buildSchema(){
+  const schema={}; const registry={};
+  S.headers.forEach(h=>{
+    const vals = S.rows.map(r=>r[h]);
+    const nonNullVals = vals.filter(v=>v!==null && v!==undefined && String(v).trim()!=='');
+    const type = inferType(vals);
+    const nullCount = vals.length - nonNullVals.length;
+    const unique = new Set(nonNullVals.map(String)).size;
+    let stats = {};
+    if(type==='numeric'){
+      const nums = nonNullVals.map(v=>toNum(v)).filter(v=>!isNaN(v));
+      const m = mean(nums); const sd = stddev(nums,m); const sorted=[...nums].sort((a,b)=>a-b);
+      stats = {
+        mean:m, median:median(nums), std:sd, min:sorted[0], max:sorted[sorted.length-1],
+        q1:quartile(sorted,0.25), q3:quartile(sorted,0.75), n:nums.length
+      };
+      registry[`col:${h}.mean`] = {value:stats.mean, label:`mean(${h})`};
+      registry[`col:${h}.median`] = {value:stats.median, label:`median(${h})`};
+      registry[`col:${h}.std`] = {value:stats.std, label:`std(${h})`};
+      registry[`col:${h}.min`] = {value:stats.min, label:`min(${h})`};
+      registry[`col:${h}.max`] = {value:stats.max, label:`max(${h})`};
+      registry[`col:${h}.n`] = {value:stats.n, label:`n(${h})`};
+    }
+    registry[`col:${h}.nullPct`] = {value: Math.round((nullCount/vals.length)*1000)/10, label:`null%(${h})`};
+    registry[`col:${h}.unique`] = {value: unique, label:`unique(${h})`};
+    schema[h] = {type, nullCount, nullPct: Math.round((nullCount/vals.length)*1000)/10, unique, stats};
+  });
+  registry['dataset.rowCount'] = {value: S.rows.length, label:'row count'};
+  registry['dataset.colCount'] = {value: S.headers.length, label:'column count'};
+  S.schema = schema; S.statsRegistry = registry;
+}
+
+/* ============================= DATA QUALITY ============================= */
+function runQualityChecks(){
+  const flags=[];
+  const rowStrings = S.rows.map(r=>JSON.stringify(S.headers.map(h=>r[h])));
+  const dupSet = new Map();
+  rowStrings.forEach(s=>dupSet.set(s,(dupSet.get(s)||0)+1));
+  const dupCount = [...dupSet.values()].filter(c=>c>1).reduce((a,c)=>a+c-1,0);
+  if(dupCount>0) flags.push({sev:'high', title:`${dupCount} duplicate row(s) detected`, detail:'Exact-match duplicate rows found across the full dataset.'});
+
+  Object.entries(S.schema).forEach(([h,info])=>{
+    if(info.nullPct >= 20) flags.push({sev: info.nullPct>=50?'high':'med', title:`"${h}" is ${info.nullPct}% empty`, detail:'High null rate may weaken any insight grounded in this column.'});
+    if(info.type==='numeric'){
+      const bad = S.rows.filter(r=>{const v=r[h]; return v!==null && v!==undefined && String(v).trim()!=='' && isNaN(toNum(v));}).length;
+      if(bad>0) flags.push({sev:'med', title:`"${h}" has ${bad} non-numeric value(s)`, detail:'Column is mostly numeric but contains inconsistent entries.'});
+    }
+    if(info.type==='date'){
+      const formats = new Set();
+      S.rows.forEach(r=>{
+        const v = r[h]; if(!v) return;
+        const s = String(v).trim();
+        if(/^\d{4}-\d{1,2}-\d{1,2}/.test(s)) formats.add('YYYY-MM-DD');
+        else if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) formats.add('MM/DD/YYYY');
+        else if(/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(s)) formats.add('MM/DD/YY');
+        else formats.add('other');
+      });
+      if(formats.size>1) flags.push({sev:'med', title:`"${h}" has mixed date formats`, detail:`Detected patterns: ${[...formats].join(', ')}.`});
+    }
+  });
+  if(flags.length===0) flags.push({sev:'low', title:'No structural issues found', detail:'No duplicate rows, high null rates, or type mismatches detected.'});
+  S.quality = flags;
+}
+
+/* ============================= ANOMALY DETECTION ============================= */
+function runAnomalyDetection(){
+  const results=[];
+  Object.entries(S.schema).forEach(([h,info])=>{
+    if(info.type!=='numeric' || info.stats.n < 5) return;
+    const {mean:m, std:sd, q1, q3} = info.stats;
+    const iqr = q3-q1;
+    const lowFence = q1 - 1.5*iqr, highFence = q3 + 1.5*iqr;
+    const flagged=[];
+    S.rows.forEach((r,idx)=>{
+      const raw = r[h]; if(raw===null||raw===undefined||String(raw).trim()==='') return;
+      const v = toNum(raw); if(isNaN(v)) return;
+      const z = sd>0 ? (v-m)/sd : 0;
+      if(Math.abs(z)>3 || v<lowFence || v>highFence) flagged.push({idx, value:v, z:Math.round(z*100)/100});
+    });
+    if(flagged.length>0){
+      results.push({column:h, count:flagged.length, pct: Math.round((flagged.length/info.stats.n)*1000)/10, examples: flagged.slice(0,5), method:'z-score>3 or outside 1.5×IQR'});
+      S.statsRegistry[`col:${h}.anomalies`] = {value: flagged.length, label:`anomalies(${h})`};
+    }
+  });
+  S.anomalies = results;
+}
+
+/* ============================= DATE PARSER ============================= */
+function parseDateStr(v){
+  if(v===null || v===undefined) return null;
+  if(v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  const s = String(v).trim();
+  if(!s) return null;
+  let d = new Date(s);
+  if(!isNaN(d.getTime())) return d;
+  const parts = s.split(/[\/\-\.]/);
+  if(parts.length === 3){
+    const p1 = parseInt(parts[0], 10);
+    const p2 = parseInt(parts[1], 10);
+    const p3 = parseInt(parts[2], 10);
+    if(!isNaN(p1) && !isNaN(p2) && !isNaN(p3)){
+      if(p3 > 1000){
+        if(p2 <= 12 && p1 <= 31){
+          d = new Date(p3, p2 - 1, p1);
+          if(!isNaN(d.getTime())) return d;
+        }
+        if(p1 <= 12 && p2 <= 31){
+          d = new Date(p3, p1 - 1, p2);
+          if(!isNaN(d.getTime())) return d;
+        }
+      } else if(p1 > 1000){
+        if(p2 <= 12 && p3 <= 31){
+          d = new Date(p1, p2 - 1, p3);
+          if(!isNaN(d.getTime())) return d;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/* ============================= CORRELATIONS ============================= */
+function pearson(a,b){
+  const n=a.length;
+  if(n===0) return 0;
+  const ma=mean(a), mb=mean(b);
+  let num=0, da=0, db=0;
+  for(let i=0;i<n;i++){
+    const diffA = a[i] - ma;
+    const diffB = b[i] - mb;
+    num += diffA * diffB;
+    da += diffA * diffA;
+    db += diffB * diffB;
+  }
+  const denom = Math.sqrt(da * db);
+  if(denom === 0) return 0;
+  const rawR = num / denom;
+  return Math.max(-1, Math.min(1, rawR));
+}
+function runCorrelations(){
+  const numericCols = Object.entries(S.schema).filter(([h,i])=>i.type==='numeric').map(([h])=>h);
+  const pairs=[];
+  for(let i=0;i<numericCols.length;i++){
+    for(let j=i+1;j<numericCols.length;j++){
+      const c1=numericCols[i], c2=numericCols[j];
+      const rows = S.rows.filter(r=>{
+        const v1=r[c1], v2=r[c2];
+        return v1!==null&&v1!==undefined&&String(v1).trim()!==''&&v2!==null&&v2!==undefined&&String(v2).trim()!=='' && !isNaN(toNum(v1)) && !isNaN(toNum(v2));
+      });
+      if(rows.length<5) continue;
+      const a = rows.map(r=>toNum(r[c1]));
+      const b = rows.map(r=>toNum(r[c2]));
+      const r = pearson(a,b);
+      const roundedR = Math.round(r*1000)/1000;
+      if(Math.abs(roundedR) >= 0.6){
+        pairs.push({c1, c2, r: roundedR, n: rows.length});
+        S.statsRegistry[`corr:${c1}_${c2}`] = {value: roundedR, label: `correlation(${c1}, ${c2})`};
+      }
+    }
+  }
+  pairs.sort((x,y)=>Math.abs(y.r)-Math.abs(x.r));
+  S.correlations = pairs;
+}
+
+/* ============================= FORECAST ============================= */
+function isIdColumn(colName, stats){
+  const lower = colName.toLowerCase().trim();
+  const idPatterns = ['id', 'index', 'seq', 'number', 'num', 'code', 'row', 'key', 'uuid', 'guid', 'count_id'];
+  if(idPatterns.some(p => lower === p || lower.endsWith('_' + p) || lower.startsWith(p + '_'))){
+    return true;
+  }
+  if(stats && stats.n > 5 && stats.min >= 0 && (stats.max - stats.min === stats.n - 1) && stats.std > 0){
+    const isConsecutiveInts = Math.abs(stats.mean - (stats.min + stats.max)/2) < 0.01;
+    if(isConsecutiveInts) return true;
+  }
+  return false;
+}
+
+function runForecast(){
+  const dateCol = Object.entries(S.schema).find(([h,i])=>i.type==='date');
+  const numCols = Object.entries(S.schema).filter(([h,i])=>i.type==='numeric');
+  if(!dateCol || numCols.length===0){ S.forecast=null; return; }
+  const [dcol] = dateCol;
+  
+  let targetNumCol = numCols.find(([h, i])=>!isIdColumn(h, i.stats));
+  if(!targetNumCol) targetNumCol = numCols[0];
+  const [ncol] = targetNumCol;
+  
+  const rawPts = S.rows.map(r=>{
+    const d = parseDateStr(r[dcol]);
+    const v = toNum(r[ncol]);
+    return {d, v};
+  }).filter(p=>p.d!==null && !isNaN(p.v));
+
+  if(rawPts.length<6){ S.forecast=null; return; }
+
+  const dateMap = new Map();
+  rawPts.forEach(p=>{
+    const isoDate = p.d.toISOString().slice(0,10);
+    if(!dateMap.has(isoDate)){
+      dateMap.set(isoDate, {dateObj: p.d, sum: p.v, count: 1});
+    } else {
+      const existing = dateMap.get(isoDate);
+      existing.sum += p.v;
+      existing.count += 1;
+    }
+  });
+
+  const pts = [...dateMap.entries()]
+    .map(([isoDate, data])=>({
+      dateStr: isoDate,
+      d: data.dateObj,
+      v: data.sum / data.count
+    }))
+    .sort((a,b)=>a.d - b.d);
+
+  if(pts.length<4){ S.forecast=null; return; }
+
+  const values = pts.map(p=>p.v);
+  const labels = pts.map(p=>p.dateStr);
+
+  const xs = values.map((_,i)=>i);
+  const mx = mean(xs), my = mean(values);
+  const denominator = xs.reduce((s,x)=>(s + (x-mx)**2), 0) || 1;
+  const slope = xs.reduce((s,x,i)=>(s + (x-mx)*(values[i]-my)), 0) / denominator;
+  const direction = slope > 0.0001 ? 'upward' : slope < -0.0001 ? 'downward' : 'flat';
+
+  const alpha = 0.3;
+  let level = values[0];
+  const smoothed = [level];
+  for(let i=1; i<values.length; i++){
+    level = alpha * values[i] + (1 - alpha) * level;
+    smoothed.push(level);
+  }
+  const lastLevel = smoothed[smoothed.length - 1];
+
+  const forecastPts = [lastLevel + slope, lastLevel + slope * 2, lastLevel + slope * 3];
+
+  S.forecast = {column:ncol, dateColumn:dcol, labels, values, smoothed, forecastPts, direction, slope};
+  S.statsRegistry['forecast.direction'] = {value:direction, label:`trend direction(${ncol})`};
+  S.statsRegistry['forecast.slope'] = {value:Math.round(slope*1000)/1000, label:`trend slope(${ncol})`};
+}
+
+/* ============================= CLAUDE API ============================= */
+// Standalone deployment: the browser can't safely hold an Anthropic API key,
+// so this calls our own backend, which holds the key server-side and forwards
+// Dynamic HTTPS-aware backend URL resolution to prevent browser mixed-content blocks
+const getBackendUrl = () => {
+  if (window.DATA_EXPLAINER_BACKEND_URL) return window.DATA_EXPLAINER_BACKEND_URL;
+  if (window.location.protocol === 'https:') {
+    return window.location.port ? `https://${window.location.hostname}:8000` : window.location.origin;
+  }
+  return 'http://localhost:8000';
+};
+const BACKEND_URL = getBackendUrl();
+
+async function callClaude(systemPrompt, userPrompt, maxTokens){
+  const resp = await fetch(`${BACKEND_URL}/api/claude`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      system: systemPrompt,
+      prompt: userPrompt,
+      max_tokens: maxTokens || 1000
+    })
+  });
+  if(!resp.ok){
+    let detail = resp.statusText;
+    try{ const errJson = await resp.json(); detail = errJson.detail || detail; }catch(e){}
+    throw new Error(`Backend error (${resp.status}): ${detail}`);
+  }
+  const data = await resp.json();
+  return data.text || "";
+}
+function stripJson(text){
+  let t = text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  const first = t.indexOf('{'); const last = t.lastIndexOf('}');
+  if(first>=0 && last>first) t = t.slice(first,last+1);
+  return t;
+}
+
+/* ---- build compact stats payload (no raw rows except tiny redacted sample) ---- */
+function buildStatsPayload(){
+  const schemaOut = {};
+  Object.entries(S.schema).forEach(([h,i])=>{
+    schemaOut[h] = {type:i.type, nullPct:i.nullPct, unique:i.unique, stats: i.type==='numeric' ? {
+      mean:fmtNum(i.stats.mean), median:fmtNum(i.stats.median), std:fmtNum(i.stats.std), min:fmtNum(i.stats.min), max:fmtNum(i.stats.max), n:i.stats.n
+    } : undefined};
+  });
+  const sample = S.rows.slice(0,3).map(r=>{
+    const o={}; S.headers.forEach(h=>o[h]=r[h]); return o;
+  });
+  return {
+    rowCount: S.rows.length, columnCount: S.headers.length,
+    schema: schemaOut,
+    qualityFlags: S.quality.map(f=>({sev:f.sev, title:f.title})),
+    anomalies: S.anomalies.map(a=>({column:a.column, count:a.count, pct:a.pct})),
+    correlations: S.correlations.map(c=>({a:c.c1, b:c.c2, r:c.r})),
+    forecast: S.forecast ? {column:S.forecast.column, direction:S.forecast.direction, slope:fmtNum(S.forecast.slope)} : null,
+    availableStatKeys: Object.keys(S.statsRegistry),
+    anonymizedSample: sample
+  };
+}
+
+async function generateInsights(){
+  const btn = $('genInsightsBtn');
+  btn.disabled=true; btn.textContent='Generating…';
+  const listEl = $('insightsList');
+  listEl.innerHTML = `<div class="loading-line"><span class="spinner"></span> Computing statistics locally, then requesting narration…</div>`;
+
+  const payload = buildStatsPayload();
+  const sys = `You are a data-narration engine. You NEVER see raw data, only precomputed statistics. You must respond with ONLY valid JSON, no markdown fences, no preamble, matching exactly this shape:
+{"insights":[{"text":"...", "confidence":"high|medium|low", "supporting_stat":"<one of the availableStatKeys>", "source_columns":["..."]}],
+"chart_config":[{"type":"bar|line|scatter","x":"<column>","y":"<column>","title":"...","reasoning":"..."}],
+"data_quality_notes":["..."],
+"suggested_followups":["...","...","..."]}
+Rules: produce 4 to 7 insights. Every insight's supporting_stat MUST be an exact string from availableStatKeys — never invent a key. Confidence should reflect n and null rate: low n or high nullPct means lower confidence. Write insights as rich, detailed paragraphs (2-3 sentences each) in plain business language — include specific numbers (means, medians, std devs, percentages, anomaly counts, correlation coefficients) drawn from the statistics. Propose 1-3 chart_config entries using only column names present in schema. Make each insight substantive and data-rich.`;
+  const usr = `Dataset statistics:\n${JSON.stringify(payload)}\n\nRespond with the JSON object only.`;
+
+  logAudit('LLM call', `insight generation · payload ≈ ${JSON.stringify(payload).length} chars (raw file was ≈ ${S._rawSize||'?'} chars) · no raw rows beyond 3-row redacted sample`);
+
+  let parsed=null, attempt=0, lastErr=null;
+  while(attempt<2 && !parsed){
+    attempt++;
+    try{
+      const text = await callClaude(sys, attempt===1?usr:`${usr}\n\nYour previous response failed validation: ${lastErr}. Fix it and return ONLY the corrected JSON object.`, 2000);
+      const json = JSON.parse(stripJson(text));
+      // grounding validation
+      const validKeys = new Set(Object.keys(S.statsRegistry));
+      const groundedInsights = (json.insights||[]).filter(ins => ins.supporting_stat && validKeys.has(ins.supporting_stat));
+      const rejected = (json.insights||[]).length - groundedInsights.length;
+      if(groundedInsights.length===0){ lastErr='no insight had a valid supporting_stat key'; continue; }
+      json.insights = groundedInsights;
+      json._rejectedCount = rejected;
+      parsed = json;
+    }catch(e){ lastErr = e.message; }
+  }
+
+  btn.disabled=false; btn.textContent='Regenerate insights';
+
+  if(!parsed){
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">!</div>Could not produce a grounded response after retry. Showing deterministic fallback instead.</div>`;
+    parsed = fallbackInsights();
+    logAudit('Self-healing fallback', 'LLM response failed grounding validation twice; used deterministic default insights');
+  } else if(parsed._rejectedCount>0){
+    logAudit('Grounding validation', `${parsed._rejectedCount} ungrounded insight(s) dropped — supporting_stat not found in statsRegistry`);
+  }
+
+  S.insights = parsed.insights||[];
+  S.chartConfigs = mergeChartConfigs(parsed.chart_config, deterministicChartConfigs());
+  renderInsights();
+  renderCharts();
+  if(parsed.data_quality_notes && parsed.data_quality_notes.length){
+    // merge narrative quality notes as low-severity flags at the end
+    parsed.data_quality_notes.forEach(n=>S.quality.push({sev:'low', title:n, detail:'Noted during insight narration.'}));
+    renderQuality();
+  }
+}
+
+function fallbackInsights(){
+  const insights=[];
+  const chart_config=[];
+  const data_quality_notes=[];
+  const suggested_followups=[];
+
+  // always include dataset overview
+  insights.push({text:`This dataset contains ${S.rows.length.toLocaleString()} rows across ${S.headers.length} columns, with ${Object.keys(S.schema).filter(h=>S.schema[h].type==='numeric').length} numeric field(s) and ${Object.keys(S.schema).filter(h=>S.schema[h].type==='text').length} text field(s).`, confidence:'high', supporting_stat:'dataset.rowCount', source_columns:[]});
+
+  // numeric column stats
+  const numericCols = Object.entries(S.schema).filter(([h,i])=>i.type==='numeric');
+  numericCols.forEach(([h,i])=>{
+    if(i.stats.n > 0){
+      insights.push({text:`${h} has a mean of ${fmtNum(i.stats.mean)}, median of ${fmtNum(i.stats.median)}, and standard deviation of ${fmtNum(i.stats.std)}. Values range from ${fmtNum(i.stats.min)} to ${fmtNum(i.stats.max)} across ${i.stats.n} non-null records (${i.nullPct}% missing).`, confidence:'high', supporting_stat:`col:${h}.mean`, source_columns:[h]});
+    }
+  });
+
+  // text column uniqueness
+  const textCols = Object.entries(S.schema).filter(([h,i])=>i.type==='text');
+  textCols.forEach(([h,i])=>{
+    const uniqPct = Math.round((i.unique / Math.max(i.nullCount + i.unique, 1)) * 100);
+    insights.push({text:`${h} has ${i.unique} unique values (${uniqPct}% distinct) and is ${i.nullPct}% empty.`, confidence:'high', supporting_stat:`col:${h}.unique`, source_columns:[h]});
+  });
+
+  // quality flags
+  const highFlags = S.quality.filter(f=>f.sev==='high');
+  const medFlags = S.quality.filter(f=>f.sev==='med');
+  if(highFlags.length > 0){
+    insights.push({text:`${highFlags.length} high-severity data quality issue(s) detected: ${highFlags.map(f=>f.title).join('; ')}. These may affect analysis reliability.`, confidence:'high', supporting_stat:'dataset.rowCount', source_columns:[]});
+    highFlags.forEach(f=>data_quality_notes.push(f.title));
+  }
+  if(medFlags.length > 0){
+    data_quality_notes.push(...medFlags.map(f=>f.title));
+  }
+
+  // anomalies
+  if(S.anomalies.length > 0){
+    S.anomalies.slice(0,3).forEach(a=>{
+      insights.push({text:`${a.count} anomalous value(s) found in ${a.column} (${a.pct}% of values), detected via z-score and IQR outlier analysis.`, confidence:'high', supporting_stat:`col:${a.column}.mean`, source_columns:[a.column]});
+    });
+    suggested_followups.push(`What anomalies exist in ${S.anomalies[0].column}?`);
+  }
+
+  // correlations
+  if(S.correlations.length > 0){
+    S.correlations.slice(0,3).forEach(c=>{
+      const strength = Math.abs(c.r) >= 0.8 ? 'strong' : 'moderate';
+      insights.push({text:`${c.c1} and ${c.c2} show a ${strength} ${c.r > 0 ? 'positive' : 'negative'} correlation (r = ${c.r}).`, confidence:'high', supporting_stat:'dataset.rowCount', source_columns:[c.c1, c.c2]});
+    });
+    suggested_followups.push(`Why are ${S.correlations[0].c1} and ${S.correlations[0].c2} correlated?`);
+  }
+
+  // forecast
+  if(S.forecast){
+    insights.push({text:`${S.forecast.column} shows a ${S.forecast.direction} trend over time (slope: ${fmtNum(S.forecast.slope)} per period), based on exponential smoothing.`, confidence:'medium', supporting_stat:'forecast.direction', source_columns:[S.forecast.column]});
+  }
+
+  // PII summary
+  if(S.piiSummary.redactedCount > 0){
+    insights.push({text:`${S.piiSummary.redactedCount} sensitive values were automatically redacted across ${Object.keys(S.piiSummary.byColumn).length} column(s) before any data was sent externally.`, confidence:'high', supporting_stat:'dataset.rowCount', source_columns:[]});
+  }
+
+  // suggest follow-up questions
+  if(suggested_followups.length < 3){
+    const defaultQs = ['Which column has the most missing values?','What is the average of the largest numeric column?','Are there any strong correlations?'];
+    defaultQs.forEach(q=>{ if(!suggested_followups.includes(q)) suggested_followups.push(q); });
+  }
+
+  // suggest charts
+  const categorical = Object.entries(S.schema).filter(([h,i])=>i.type==='text' && i.unique>1 && i.unique<=30).map(([h])=>h);
+  if(categorical.length && numericCols.length){
+    chart_config.push({type:'bar', x:categorical[0], y:numericCols[0][0], title:`${numericCols[0][0]} by ${categorical[0]}`, reasoning:'Average of the first numeric column grouped by categories.'});
+  }
+  if(numericCols.length >= 2){
+    chart_config.push({type:'scatter', x:numericCols[0][0], y:numericCols[1][0], title:`${numericCols[0][0]} vs ${numericCols[1][0]}`, reasoning:'Relationship between the two leading numeric columns.'});
+  } else if(numericCols.length === 1 && S.forecast){
+    chart_config.push({type:'line', x:S.forecast.dateColumn, y:numericCols[0][0], title:`${numericCols[0][0]} over time`, reasoning:'Trend of the only numeric column over time.'});
+  }
+
+  return {insights, chart_config, data_quality_notes, suggested_followups};
+}
+
+/* ============================= RENDER ============================= */
+function switchPanel(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.rail-item').forEach(r=>r.classList.remove('active'));
+  $('panel-'+name).classList.add('active');
+  document.querySelector(`.rail-item[data-panel="${name}"]`).classList.add('active');
+}
+
+function renderOverview(){
+  $('overviewSub').textContent = `${S.fileName} · ${S.rows.length.toLocaleString()} rows · ${S.headers.length} columns`;
+  $('fileNamePill').style.display='inline-block';
+  $('fileNamePill').textContent = S.fileName;
+  const dq = S.quality.filter(f=>f.sev!=='low').length;
+  $('statCards').innerHTML = [
+    {lbl:'Rows', num: S.rows.length.toLocaleString()},
+    {lbl:'Columns', num: S.headers.length},
+    {lbl:'Quality flags', num: dq},
+    {lbl:'PII values scrubbed', num: S.piiSummary.redactedCount},
+  ].map(c=>`<div class="card stat-card"><div class="lbl">${c.lbl}</div><div class="num">${c.num}</div></div>`).join('');
+
+  const tbody = document.querySelector('#schemaTable tbody');
+  tbody.innerHTML = S.headers.map(h=>{
+    const i = S.schema[h];
+    const summary = i.type==='numeric' ? `μ ${fmtNum(i.stats.mean)} · σ ${fmtNum(i.stats.std)} · [${fmtNum(i.stats.min)}, ${fmtNum(i.stats.max)}]` : `${i.unique} unique values`;
+    return `<tr><td>${esc(h)}</td><td><span class="badge ${i.type}">${i.type}</span></td><td class="mono-cell">${i.nullPct}%</td><td class="mono-cell">${i.unique}</td><td class="mono-cell">${summary}</td></tr>`;
+  }).join('');
+
+  const piiEntries = Object.entries(S.piiSummary.byColumn);
+  $('piiCard').innerHTML = piiEntries.length ? piiEntries.map(([c,v])=>
+    `<div class="flag"><div class="sev ${v.count>0?'high':'low'}"></div><div class="body"><strong>${esc(c)}</strong><span>${v.count} value(s) pattern-matched and redacted${v.headerFlagged?' · header name suggests sensitive content':''}</span></div></div>`
+  ).join('') : `<div class="empty-state"><div class="ico">✓</div>No email, phone, SSN, or card-number patterns detected in this file.</div>`;
+
+  $('navRows').textContent = S.rows.length.toLocaleString();
+}
+
+function renderQuality(){
+  $('qualityList').innerHTML = S.quality.map(f=>`<div class="flag"><div class="sev ${f.sev}"></div><div class="body"><strong>${esc(f.title)}</strong><span>${esc(f.detail)}</span></div></div>`).join('');
+  $('navQuality').textContent = S.quality.filter(f=>f.sev!=='low').length;
+  $('navQuality').className = 'count' + (S.quality.some(f=>f.sev==='high') ? ' warn':' ok');
+}
+
+function confClass(c){ return c==='low'?'low':c==='medium'?'med':''; }
+function confPct(c){ return c==='high'?90:c==='medium'?60:30; }
+
+function generatePalette(n){
+  const base = ['#E8A33D','#2F6F68','#D6584B','#8792A6','#F6F4EE','#4A3A20','#173330','#3A211D','#7FCFC3','#B7DED8'];
+  const out = [];
+  for(let i=0;i<n;i++) out.push(base[i % base.length]);
+  return out;
+}
+
+function renderInsights(){
+  const listEl = $('insightsList');
+  if(!S.insights.length){
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">◇</div>No insights generated yet. Click "Generate insights" — only computed statistics are sent, never raw rows.</div>`;
+    $('navInsights').textContent = 0;
+    return;
+  }
+  listEl.innerHTML = S.insights.map(ins=>{
+    const stat = S.statsRegistry[ins.supporting_stat];
+    const statLabel = stat ? stat.label : ins.supporting_stat;
+    const statVal = stat ? fmtNum(stat.value) : '';
+    return `<div class="insight">
+      <div class="insight-top">
+        <h3>${esc(ins.text)}</h3>
+        <div class="conf ${confClass(ins.confidence)}">${esc(ins.confidence||'—')}<div class="conf-bar"><i style="width:${confPct(ins.confidence)}%"></i></div></div>
+      </div>
+      ${ins.source_columns && ins.source_columns.length ? `<div class="cols-touched">${ins.source_columns.map(c=>`<span class="col-tag">${esc(c)}</span>`).join('')}</div>`:''}
+      <div class="ledger">grounded in <span class="chip">${esc(statLabel)} = ${esc(statVal)}</span></div>
+    </div>`;
+  }).join('');
+  $('navInsights').textContent = S.insights.length;
+}
+
+const chartInstances=[];
+
+// resolve a model-provided column name to the real header, tolerating case/whitespace drift
+function resolveColumn(name){
+  if(name==null) return null;
+  if(S.headers.includes(name)) return name;
+  const norm = String(name).trim().toLowerCase();
+  return S.headers.find(h=>h.trim().toLowerCase()===norm) || null;
+}
+
+// build 1-2 sensible charts straight from the schema when the model's picks don't resolve
+function mergeChartConfigs(llmCharts, deterministicCharts){
+  // Always return all deterministic charts plus any LLM charts
+  // This ensures charts don't disappear after insight generation
+  const merged = [...deterministicCharts];
+  if(llmCharts && llmCharts.length){
+    llmCharts.forEach(lc => {
+      // Only add LLM chart if it's not an exact duplicate of a deterministic one
+      const exists = deterministicCharts.some(dc => dc.type === lc.type && dc.x === lc.x && dc.y === lc.y);
+      if(!exists) merged.push(lc);
+    });
+  }
+  return merged;
+}
+
+function deterministicChartConfigs(){
+  const numeric = Object.entries(S.schema).filter(([h,i])=>i.type==='numeric').map(([h])=>h);
+  const categorical = Object.entries(S.schema).filter(([h,i])=>i.type==='text' && i.unique>1 && i.unique<=30).map(([h])=>h);
+  const configs=[];
+
+  // Always include a bar chart when we have categorical + numeric
+  if(categorical.length && numeric.length){
+    configs.push({type:'bar', x:categorical[0], y:numeric[0], title:`${numeric[0]} by ${categorical[0]}`, reasoning:'Average of a numeric column grouped by category.'});
+  }
+
+  // Always include a pie chart when we have categorical + numeric
+  if(categorical.length && numeric.length){
+    const cat = categorical[0];
+    const num = numeric[0];
+    const groups={};
+    S.rows.forEach(r=>{
+      const k = String(r[cat]); const v = toNum(r[num]);
+      if(isNaN(v)) return;
+      (groups[k]=groups[k]||[]).push(v);
+    });
+    const pieLabels = Object.keys(groups).slice(0,10);
+    const pieData = pieLabels.map(k=>mean(groups[k]));
+    configs.push({type:'pie', x:cat, y:num, title:`${num} by ${cat}`, reasoning:'Share of numeric values across categories.', labels: pieLabels, values: pieData});
+  }
+
+  // Try to find "units/qty sold" vs "revenue/sales" columns by name heuristics
+  const unitKeywords = ['unit','qty','quantity','count','sold','volume','number'];
+  const revenueKeywords = ['revenue','sales','amount','price','value','total','cost','profit','income'];
+  let unitCol = numeric.find(h=>unitKeywords.some(k=>h.toLowerCase().includes(k)));
+  let revenueCol = numeric.find(h=>revenueKeywords.some(k=>h.toLowerCase().includes(k)));
+
+  // If both found, create a scatter chart — classic "units vs revenue" relationship
+  if(unitCol && revenueCol && unitCol !== revenueCol){
+    configs.push({type:'scatter', x:unitCol, y:revenueCol, title:`${revenueCol} vs ${unitCol} (${unitCol} on X axis)`, reasoning:'Units-to-revenue relationship chart — typically shows whether sales volume drives revenue linearly.'});
+  } else if(numeric.length >= 2){
+    configs.push({type:'scatter', x:numeric[0], y:numeric[1], title:`${numeric[1]} vs ${numeric[0]}`, reasoning:'Relationship between the leading numeric columns.'});
+  }
+
+  // If we have a date column and a numeric column, create a line chart over time
+  const dateCol = S.forecast ? S.forecast.dateColumn : null;
+  const forecastCol = S.forecast ? S.forecast.column : null;
+  if(dateCol && forecastCol){
+    configs.push({type:'line', x:dateCol, y:forecastCol, title:`${forecastCol} over time`, reasoning:'Trend of the primary numeric column plotted chronologically.'});
+  }
+
+  return configs;
+}
+
+function renderCharts(){
+  chartInstances.forEach(c=>c.destroy());
+  chartInstances.length=0;
+  const grid = $('chartsGrid');
+
+  // resolve + validate every config the model gave us; keep only ones with real columns
+  let usable = (S.chartConfigs||[]).map(c=>({...c, x:resolveColumn(c.x), y:resolveColumn(c.y)})).filter(c=>c.x && c.y);
+  let usingFallback = false;
+  if(!usable.length){
+    usable = deterministicChartConfigs();
+    usingFallback = true;
+  }
+  if(!usable.length){
+    grid.innerHTML = `<div class="empty-state"><div class="ico">▤</div>Not enough numeric or categorical structure in this dataset to chart yet.</div>`;
+    $('navCharts').textContent=0;
+    return;
+  }
+
+  grid.innerHTML = usable.map((c,idx)=>`<div class="chart-wrap"><h3>${esc(c.title||'Chart')}</h3><div class="reason">${esc(c.reasoning||'')}${usingFallback?' (deterministic fallback — the model did not pick real columns)':''}</div><div class="chart-canvas-holder"><canvas id="chartCanvas${idx}"></canvas></div></div>`).join('');
+  $('navCharts').textContent = usable.length;
+
+  // defer to next frame so the grid has actually laid out (fixes zero-height canvas on first paint),
+  // and wait for Chart.js to actually be available before touching it
+  requestAnimationFrame(()=>{
+    ensureChartJs().then(()=>{
+      usable.forEach((c,idx)=>{
+        const canvas = $('chartCanvas'+idx); if(!canvas) return;
+        let labels, data;
+        if(S.schema[c.x] && S.schema[c.x].type!=='numeric'){
+          // categorical X axis — group by category, show mean of Y
+          const groups={};
+          S.rows.forEach(r=>{
+            const k = String(r[c.x]); const v = toNum(r[c.y]);
+            if(isNaN(v)) return;
+            (groups[k]=groups[k]||[]).push(v);
+          });
+          labels = Object.keys(groups).slice(0,20);
+          data = labels.map(k=>mean(groups[k]));
+        } else {
+          // both X and Y are numeric — prepare scatter data points
+          const pts = S.rows.map(r=>({x:toNum(r[c.x]), y:toNum(r[c.y])})).filter(p=>!isNaN(p.x)&&!isNaN(p.y)).slice(0,500);
+          if(pts.length === 0){
+            canvas.parentElement.insertAdjacentHTML('beforeend', `<div class="empty-state" style="padding:16px;">No valid numeric pairs to plot for this column combination.</div>`);
+            return;
+          }
+          labels = pts.map(p=>p.x);
+          data = pts.map(p=>p.y);
+        }
+        if(!labels || !labels.length){
+          canvas.parentElement.insertAdjacentHTML('beforeend', `<div class="empty-state" style="padding:16px;">No valid data to plot for this column combination.</div>`);
+          return;
+        }
+        const type = c.type==='scatter' ? 'scatter' : (c.type==='line'?'line':c.type==='pie'?'pie':'bar');
+        let ds, chartLabels = labels;
+        if(type==='pie'){
+          ds = c.values || data;
+          chartLabels = c.labels || labels;
+        } else if(type==='scatter'){
+          ds = labels.map((x,i)=>({x, y:data[i]}));
+        } else {
+          ds = data;
+        }
+        const bgColors = type==='pie' ? generatePalette(chartLabels.length) : (type==='scatter' ? 'rgba(232,163,61,0.5)' : '#E8A33D');
+        const chartConfig = {
+          type: type,
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              label: c.y,
+              data: ds,
+              backgroundColor: bgColors,
+              borderColor: '#2F6F68',
+              borderWidth: type==='line' ? 2 : (type==='pie' ? 1 : 1),
+              pointRadius: type==='scatter' ? 4 : 0,
+              pointBackgroundColor: '#E8A33D'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+              padding: type === 'pie' ? { top: 12, bottom: 12, left: 12, right: 12 } : 0
+            },
+            plugins: {
+              legend: { display: type==='pie', position:'right', labels:{ color:'#8792A6', font:{size:11}, boxWidth:12, padding:10 } },
+              tooltip: {
+                callbacks: {
+                  label: function(ctx) {
+                    if(type==='scatter') return `(${fmtNum(ctx.parsed.x)}, ${fmtNum(ctx.parsed.y)})`;
+                    if(type==='pie') {
+                      const val = (ctx.raw !== undefined && ctx.raw !== null) ? ctx.raw : ctx.parsed;
+                      return `${ctx.label}: ${fmtNum(val)}`;
+                    }
+                    return `${c.y}: ${fmtNum(ctx.parsed.y)}`;
+                  }
+                }
+              }
+            },
+            scales: type==='pie' ? {} : {
+              x: {
+                ticks: { color: '#8792A6', maxRotation: 0, autoSkip: true },
+                grid: { color: 'rgba(246,244,238,0.06)' },
+                title: type==='scatter' ? { display: true, text: c.x, color: '#8792A6' } : undefined
+              },
+              y: {
+                ticks: { color: '#8792A6' },
+                grid: { color: 'rgba(246,244,238,0.06)' },
+                title: { display: true, text: c.y, color: '#8792A6' }
+              }
+            }
+          }
+        };
+        chartInstances.push(new Chart(canvas.getContext('2d'), chartConfig));
+      });
+    }).catch(()=>{
+      grid.insertAdjacentHTML('beforeend', `<div class="empty-state"><div class="ico">!</div>Charting library could not be loaded from any CDN in this environment. Stats and insights above are unaffected.</div>`);
+    });
+  });
+}
+
+let _chartResizeTimeout = null;
+window.addEventListener('resize', () => {
+  if (_chartResizeTimeout) clearTimeout(_chartResizeTimeout);
+  _chartResizeTimeout = setTimeout(() => {
+    chartInstances.forEach(c => {
+      try { c.resize(); } catch (e) {}
+    });
+  }, 150);
+});
+
+function renderAnomalies(){
+  const el = $('anomaliesList');
+  if(!S.anomalies.length){ el.innerHTML = `<div class="empty-state"><div class="ico">✓</div>No statistical outliers found in numeric columns.</div>`; $('navAnomalies').textContent=0; return; }
+  el.innerHTML = S.anomalies.map(a=>`<div class="insight">
+    <div class="insight-top"><h3>${a.count} outlier(s) in "${esc(a.column)}" (${a.pct}% of values)</h3></div>
+    <div class="ledger"><span class="chip">method: ${esc(a.method)}</span></div>
+    <div class="cols-touched">${a.examples.map(e=>`<span class="col-tag">row ${e.idx+1}: ${fmtNum(e.value)} (z=${e.z})</span>`).join('')}</div>
+  </div>`).join('');
+  $('navAnomalies').textContent = S.anomalies.reduce((s,a)=>s+a.count,0);
+  $('navAnomalies').className = 'count warn';
+}
+
+function renderCorrelations(){
+  const el = $('corrList');
+  if(!S.correlations.length){ el.innerHTML = `<div class="empty-state"><div class="ico">–</div>No column pairs with |r| ≥ 0.6.</div>`; $('navCorr').textContent=0; return; }
+  el.innerHTML = S.correlations.map(c=>`<div class="insight">
+    <div class="insight-top"><h3>${esc(c.c1)} ↔ ${esc(c.c2)}</h3></div>
+    <div class="ledger"><span class="chip">r = ${c.r}</span><span class="chip">n = ${c.n}</span></div>
+  </div>`).join('');
+  $('navCorr').textContent = S.correlations.length;
+}
+
+function renderForecast(){
+  const el = $('forecastArea');
+  if(!S.forecast){ el.innerHTML = `<div class="empty-state"><div class="ico">–</div>No date column paired with a numeric column was detected, so no forecast could be computed.</div>`; return; }
+  el.innerHTML = `<div class="diff-callout">Trend for <b>${esc(S.forecast.column)}</b> over <b>${esc(S.forecast.dateColumn)}</b> is <b>${S.forecast.direction}</b> (slope ${fmtNum(S.forecast.slope)} per period). Forecast below uses simple exponential smoothing (α=0.3) projected 3 periods forward — treat it as a directional signal, not a guarantee.</div>
+  <div class="chart-wrap"><h3>${esc(S.forecast.column)} — history + forecast</h3><div class="chart-canvas-holder"><canvas id="forecastCanvas"></canvas></div></div>`;
+  const recentLabels = S.forecast.labels.slice(-30);
+  const recentValues = S.forecast.values.slice(-30);
+  const labels = [...recentLabels, 'proj +1', 'proj +2', 'proj +3'];
+  const hist = [...recentValues, null, null, null];
+  const proj = recentValues.map(() => null);
+  proj[proj.length - 1] = recentValues[recentValues.length - 1];
+  proj.push(...S.forecast.forecastPts);
+  requestAnimationFrame(()=>{
+    ensureChartJs().then(()=>{
+      const canvas = $('forecastCanvas'); if(!canvas) return;
+      new Chart(canvas.getContext('2d'), {
+        type:'line',
+        data:{labels, datasets:[
+          {label:'actual', data:hist, borderColor:'#2F6F68', backgroundColor:'transparent', tension:0.2, pointRadius:0},
+          {label:'forecast', data:proj, borderColor:'#E8A33D', borderDash:[5,4], backgroundColor:'transparent', tension:0.2, pointRadius:2}
+        ]},
+        options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#8792A6'}}}, scales:{x:{ticks:{color:'#8792A6', maxRotation:0, autoSkip:true, maxTicksLimit:10}, grid:{color:'rgba(246,244,238,0.06)'}}, y:{ticks:{color:'#8792A6'}, grid:{color:'rgba(246,244,238,0.06)'}}}}
+      });
+    }).catch(()=>{
+      $('forecastArea').insertAdjacentHTML('beforeend', `<div class="empty-state"><div class="ico">!</div>Charting library could not be loaded. The trend direction and slope above are still accurate.</div>`);
+    });
+  });
+}
+
+function renderAudit(){
+  const tbody = document.querySelector('#auditTable tbody');
+  tbody.innerHTML = S.auditLog.map(a=>`<tr class="audit-row"><td>${a.time}</td><td>${esc(a.event)}</td><td>${esc(a.detail)}</td></tr>`).join('');
+  $('navAudit').textContent = S.auditLog.length;
+}
+
+/* ============================= VERSIONING / DIFF ============================= */
+async function handleVersioning(){
+  const el = $('diffArea');
+  const key = `dataset-profile:${S.fileName}`;
+  let prior=null;
+  try{
+    const res = await storage.get(key);
+    if(res && res.value) prior = JSON.parse(res.value);
+  }catch(e){ prior=null; }
+
+  const current = {
+    timestamp: new Date().toISOString(), rowCount:S.rows.length, columns:S.headers,
+    stats: Object.fromEntries(Object.entries(S.schema).filter(([h,i])=>i.type==='numeric').map(([h,i])=>[h,{mean:i.stats.mean}]))
+  };
+
+  if(!prior){
+    el.innerHTML = `<div class="empty-state"><div class="ico">1st</div>No prior version of "${esc(S.fileName)}" found in this browser. This upload has been saved as the baseline for future comparisons.</div>`;
+    $('navDiff').textContent = 'new';
+  } else {
+    const rowDelta = current.rowCount - prior.rowCount;
+    const addedCols = current.columns.filter(c=>!prior.columns.includes(c));
+    const droppedCols = prior.columns.filter(c=>!current.columns.includes(c));
+    const drift = [];
+    Object.entries(current.stats).forEach(([h,v])=>{
+      if(prior.stats[h] && prior.stats[h].mean){
+        const pct = Math.round(((v.mean - prior.stats[h].mean)/(prior.stats[h].mean||1))*1000)/10;
+        if(Math.abs(pct) >= 5) drift.push({col:h, pct});
+      }
+    });
+    el.innerHTML = `
+      <div class="diff-callout">Compared to the version uploaded ${new Date(prior.timestamp).toLocaleString()}: row count ${rowDelta>=0?'+':''}${rowDelta}, ${addedCols.length} column(s) added, ${droppedCols.length} column(s) dropped.</div>
+      <div class="grid g3">
+        <div class="card"><div class="lbl" style="font-size:11px;color:var(--slate);text-transform:uppercase;">Row delta</div><div class="num" style="font-family:'IBM Plex Mono',monospace;font-size:24px;margin-top:6px;">${rowDelta>=0?'+':''}${rowDelta}</div></div>
+        <div class="card"><div class="lbl" style="font-size:11px;color:var(--slate);text-transform:uppercase;">Columns added</div><div class="num" style="font-family:'IBM Plex Mono',monospace;font-size:24px;margin-top:6px;">${addedCols.join(', ')||'none'}</div></div>
+        <div class="card"><div class="lbl" style="font-size:11px;color:var(--slate);text-transform:uppercase;">Columns dropped</div><div class="num" style="font-family:'IBM Plex Mono',monospace;font-size:24px;margin-top:6px;">${droppedCols.join(', ')||'none'}</div></div>
+      </div>
+      ${drift.length ? `<h3 style="margin:24px 0 10px; font-size:15px;">Statistical drift (≥5% mean change)</h3>` + drift.map(d=>`<div class="flag"><div class="sev med"></div><div class="body"><strong>${esc(d.col)}</strong><span>mean shifted ${d.pct>0?'+':''}${d.pct}% since last version</span></div></div>`).join('') : ''}
+    `;
+    $('navDiff').textContent = 'diff';
+  }
+  try{ await storage.set(key, JSON.stringify(current)); }catch(e){}
+}
+
+/* ============================= FILE HANDLING ============================= */
+function parseCSV(file){
+  return new Promise((resolve,reject)=>{
+    // worker:false -- the artifact sandbox blocks Web Worker creation from CDN scripts,
+    // which made PapaParse fail silently. Parsing on the main thread instead.
+    Papa.parse(file, {
+      header:true, skipEmptyLines:true, dynamicTyping:false, worker:false,
+      transformHeader: h => h.replace(/^\uFEFF/,'').trim(), // strip BOM + stray whitespace from headers
+      transform: v => typeof v === 'string' ? v.trim() : v,  // trim stray whitespace from every cell
+      complete: res=>resolve(res),
+      error: err=>reject(err)
+    });
+  });
+}
+
+async function handleFile(file){
+  $('statusDot').classList.add('live');
+  S.fileName = file.name;
+  S._rawSize = file.size;
+  const parseResult = await parseCSV(file);
+  let rows = parseResult.data || [];
+  rows = rows.filter(r => Object.values(r).some(v => v!==null && v!==undefined && String(v).trim()!==''));
+  if(!rows.length){
+    let err = document.getElementById('uploadError');
+    if(!err){
+      err = document.createElement('div');
+      err.id='uploadError';
+      err.style.cssText='margin-top:16px; padding:12px 16px; border:1px solid var(--coral); background:var(--coral-dim); border-radius:5px; color:#F3B3AB; font-size:13px;';
+      $('dropzone').insertAdjacentElement('afterend', err);
+    }
+    err.textContent = "No rows could be read from this file. Make sure it's a valid CSV with a header row.";
+    return;
+  }
+  const existingErr = document.getElementById('uploadError');
+  if(existingErr) existingErr.remove();
+  S.rows = rows;
+  S.headers = Object.keys(rows[0]);
+  S.insights=[]; S.chartConfigs=[]; S.auditLog=[]; S.quality=[]; S.anomalies=[]; S.correlations=[]; S.forecast=null;
+
+  runPiiScrub();
+  buildSchema();
+  runQualityChecks();
+  runAnomalyDetection();
+  runCorrelations();
+  runForecast();
+
+  // Optional backend PII guardrail: check column metadata before any external call
+  try{
+    const schemaOut = {};
+    Object.entries(S.schema).forEach(([h,i])=>{
+      schemaOut[h] = { type: i.type, sample: (S.rows.slice(0,3).map(r=>String(r[h]||'')).join(' | ')) };
+    });
+    const piiResp = await fetch(`${BACKEND_URL}/api/pii/detect`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ columns: S.headers, types: schemaOut, sample_rows: S.rows.slice(0,3) })
+    });
+    if(piiResp.ok){
+      const pii = await piiResp.json();
+      if(pii.dropped_columns && pii.dropped_columns.length){
+        pii.dropped_columns.forEach(c=> logAudit('PII backend guardrail', `dropped column: ${c}`));
+      }
+    }
+  }catch(e){ /* non-blocking */ }
+
+  $('heroView').style.display='none';
+  $('shell').classList.add('active');
+
+  renderOverview();
+  renderQuality();
+  renderAnomalies();
+  renderCorrelations();
+  renderForecast();
+  renderInsights();
+  renderCharts();
+  handleVersioning();
+
+  // Reset chat for new file
+  _chatHistory = []; _chatTurnCount = 0;
+  $('chatFeed').innerHTML = '';
+  $('navChat').textContent = '0';
+  chatPopulateSuggestions();
+
+  switchPanel('overview');
+}
+
+/* ============================= CHAT ============================= */
+let _chatHistory = []; // [{role:'user'|'assistant', text:'...'}]
+let _chatTurnCount = 0;
+
+function chatBuildSystemPrompt(){
+  const payload = buildStatsPayload();
+  return `You are a data-analysis assistant answering questions about a CSV dataset. You ONLY have access to precomputed statistics — you never see raw rows. Answer concisely and ground every claim in the specific numbers provided below.
+
+Dataset statistics (JSON):
+${JSON.stringify(payload, null, 2)}
+
+Rules:
+- Be direct and conversational. 2-4 sentences max unless detail is explicitly requested.
+- Always cite specific numbers (means, medians, counts, correlations, etc.) from the statistics.
+- If the user asks about something you cannot answer from the statistics, say so honestly.
+- Do not invent column values, row counts, or statistics not present in the JSON above.`;
+}
+
+function chatAddMessage(role, text, isThinking=false){
+  const feed = $('chatFeed');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  const isAI = role === 'ai';
+  div.innerHTML = `
+    <div class="chat-avatar ${isAI?'ai':'user'}">${isAI?'AI':'You'}</div>
+    <div class="chat-bubble${isThinking?' thinking':''}">` +
+      (isThinking ? `<span class="spinner" style="vertical-align:middle; margin-right:8px;"></span>${esc(text)}` : esc(text).replace(/\n/g,'<br>')) +
+    `</div>`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+  return div;
+}
+
+async function chatSend(){
+  if(!S.rows.length) return;
+  const input = $('chatInput');
+  const question = input.value.trim();
+  if(!question) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  $('chatSendBtn').disabled = true;
+
+  _chatHistory.push({role:'user', text:question});
+  chatAddMessage('user', question);
+  const thinkingEl = chatAddMessage('ai', 'Thinking…', true);
+
+  // Build conversation payload (last 8 turns to keep tokens reasonable)
+  const turns = _chatHistory.slice(-8);
+  const userPrompt = turns.map(t=> (t.role==='user'?'User: ':'Assistant: ') + t.text).join('\n') + '\nAssistant:';
+
+  logAudit('Chat', `question: "${question.slice(0,80)}${question.length>80?'…':''}"`);
+
+  try{
+    const answer = await callClaude(chatBuildSystemPrompt(), userPrompt, 800);
+    _chatHistory.push({role:'assistant', text:answer});
+    thinkingEl.remove();
+    chatAddMessage('ai', answer);
+    _chatTurnCount++;
+    $('navChat').textContent = _chatTurnCount;
+  }catch(e){
+    thinkingEl.remove();
+    chatAddMessage('ai', `Error: ${e.message}`);
+  }
+  $('chatSendBtn').disabled = false;
+  input.focus();
+}
+
+function chatPopulateSuggestions(){
+  const sugg = [];
+  const numericCols = Object.entries(S.schema||{}).filter(([h,i])=>i.type==='numeric').map(([h])=>h);
+  const textCols = Object.entries(S.schema||{}).filter(([h,i])=>i.type==='text').map(([h])=>h);
+  sugg.push(`What are the key takeaways from this dataset?`);
+  if(numericCols[0]) sugg.push(`What is the distribution of ${numericCols[0]}?`);
+  if(S.anomalies&&S.anomalies.length) sugg.push(`Tell me about the anomalies detected.`);
+  if(S.correlations&&S.correlations.length) sugg.push(`Which columns are most correlated?`);
+  if(S.quality.some(f=>f.sev==='high')) sugg.push(`What data quality issues should I address?`);
+  if(numericCols[1]) sugg.push(`Compare ${numericCols[0]} and ${numericCols[1]}.`);
+  if(textCols[0]) sugg.push(`What are the most common values in ${textCols[0]}?`);
+
+  const el = $('chatSuggestions');
+  el.innerHTML = sugg.slice(0,5).map(s=>
+    `<button class="chat-suggestion">${esc(s)}</button>`
+  ).join('');
+  el.querySelectorAll('.chat-suggestion').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      $('chatInput').value = btn.textContent;
+      chatSend();
+    });
+  });
+}
+
+/* ============================= WIRING ============================= */
+document.querySelectorAll('.rail-item').forEach(item=>{
+  item.addEventListener('click', ()=>switchPanel(item.dataset.panel));
+});
+$('dropzone').addEventListener('click', ()=>$('fileInput').click());
+$('dropzone').addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') $('fileInput').click(); });
+$('fileInput').addEventListener('change', e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev=>$('dropzone').addEventListener(ev, e=>{e.preventDefault(); $('dropzone').classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>$('dropzone').addEventListener(ev, e=>{e.preventDefault(); $('dropzone').classList.remove('drag');}));
+$('dropzone').addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+$('genInsightsBtn').addEventListener('click', generateInsights);
+/* ============================= REPORT / EXPORT =============================
+   window.print() is blocked here: this app runs in a sandboxed iframe with no
+   allow-modals permission, so the print dialog never opens and the button
+   looked dead. Building a real report view instead, with a genuine file
+   download (Blob + anchor, no modal needed) and a copy-to-clipboard fallback. */
+function buildReportHTML(){
+  const dq = S.quality.filter(f=>f.sev!=='low');
+  const schemaRows = S.headers.map(h=>{
+    const i = S.schema[h];
+    const summary = i.type==='numeric' ? `mean ${fmtNum(i.stats.mean)} · std ${fmtNum(i.stats.std)} · range [${fmtNum(i.stats.min)}, ${fmtNum(i.stats.max)}]` : `${i.unique} unique values`;
+    return `<tr><td>${esc(h)}</td><td>${i.type}</td><td>${i.nullPct}%</td><td>${esc(summary)}</td></tr>`;
+  }).join('');
+  const insightRows = S.insights.length ? S.insights.map(ins=>{
+    const stat = S.statsRegistry[ins.supporting_stat];
+    return `<p><strong>${esc(ins.text)}</strong><br><span class="r-chip">${esc(stat?stat.label:ins.supporting_stat)} = ${esc(stat?fmtNum(stat.value):'')}</span> · confidence: ${esc(ins.confidence||'—')}</p>`;
+  }).join('') : `<p>No insights were generated in this session.</p>`;
+  const flagRows = dq.length ? dq.map(f=>`<div class="r-flag">• <strong>${esc(f.title)}</strong> — ${esc(f.detail)}</div>`).join('') : `<div class="r-flag">No structural data-quality issues found.</div>`;
+  const anomalyRows = S.anomalies.length ? S.anomalies.map(a=>`<div class="r-flag">• ${a.count} outlier(s) in <strong>${esc(a.column)}</strong> (${a.pct}% of values, ${esc(a.method)})</div>`).join('') : `<div class="r-flag">No statistical outliers detected.</div>`;
+  const corrRows = S.correlations.length ? S.correlations.map(c=>`<div class="r-flag">• <strong>${esc(c.c1)}</strong> ↔ <strong>${esc(c.c2)}</strong>: r = ${c.r} (n=${c.n})</div>`).join('') : `<div class="r-flag">No column pairs with |r| ≥ 0.6.</div>`;
+  const forecastBlock = S.forecast ? `<p>Trend for <strong>${esc(S.forecast.column)}</strong> is <strong>${S.forecast.direction}</strong> (slope ${fmtNum(S.forecast.slope)} per period), based on simple exponential smoothing. Treat as directional signal, not guarantee.</p>` : `<p>No date + numeric column pair was available to forecast.</p>`;
+
+  return `<h1>Data Explainer Report</h1>
+  <div class="report-meta">${esc(S.fileName)} · ${S.rows.length.toLocaleString()} rows · ${S.headers.length} columns · generated ${new Date().toLocaleString()}</div>
+  <h2>Schema &amp; Profile</h2>
+  <table><thead><tr><th>Column</th><th>Type</th><th>Nulls</th><th>Summary</th></tr></thead><tbody>${schemaRows}</tbody></table>
+  <h2>Data Quality</h2>${flagRows}
+  <h2>Insights</h2>${insightRows}
+  <h2>Anomalies</h2>${anomalyRows}
+  <h2>Correlations</h2>${corrRows}
+  <h2>Forecast</h2>${forecastBlock}
+  <h2>PII Handling</h2><p>${S.piiSummary.redactedCount} value(s) pattern-matched and redacted before any external call, across ${Object.keys(S.piiSummary.byColumn).length} column(s).</p>`;
+}
+function buildReportPlainText(){
+  const wrap = document.createElement('div');
+  wrap.innerHTML = buildReportHTML();
+  return wrap.innerText.replace(/\n{3,}/g,'\n\n').trim();
+}
+function openReport(){
+  $('reportSheet').innerHTML = buildReportHTML();
+  $('reportOverlay').classList.add('active');
+}
+function closeReport(){ $('reportOverlay').classList.remove('active'); }
+
+async function exportPdf(){
+  const btn = $('exportBtn');
+  const origText = btn.textContent;
+  btn.textContent = 'Generating PDF…';
+  btn.disabled = true;
+
+  try{
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+
+    // Build a temporary offscreen container with all report content rendered in light theme
+    const dq = S.quality.filter(f=>f.sev!=='low');
+    const schemaRows = S.headers.map(h=>{
+      const i = S.schema[h];
+      const summary = i.type==='numeric' ? `mean ${fmtNum(i.stats.mean)} · std ${fmtNum(i.stats.std)} · range [${fmtNum(i.stats.min)}, ${fmtNum(i.stats.max)}]` : `${i.unique} unique values`;
+      return `<tr><td>${esc(h)}</td><td>${i.type}</td><td>${i.nullPct}%</td><td>${esc(summary)}</td></tr>`;
+    }).join('');
+
+    const insightRows = S.insights.length ? S.insights.map(ins=>{
+      const stat = S.statsRegistry[ins.supporting_stat];
+      return `<div class="pdf-insight"><div class="pdf-insight-text">${esc(ins.text)}</div><div class="pdf-insight-meta"><span class="pdf-chip">${esc(stat?stat.label:ins.supporting_stat)} = ${esc(stat?fmtNum(stat.value):'')}</span> · confidence: ${esc(ins.confidence||'—')}</div></div>`;
+    }).join('') : `<p>No insights were generated.</p>`;
+
+    const flagRows = dq.length ? dq.map(f=>`<div class="pdf-flag">• <strong>${esc(f.title)}</strong> — ${esc(f.detail)}</div>`).join('') : `<div class="pdf-flag">No structural data-quality issues found.</div>`;
+    const anomalyRows = S.anomalies.length ? S.anomalies.map(a=>`<div class="pdf-flag">• ${a.count} outlier(s) in <strong>${esc(a.column)}</strong> (${a.pct}% of values)</div>`).join('') : `<div class="pdf-flag">No statistical outliers detected.</div>`;
+    const corrRows = S.correlations.length ? S.correlations.map(c=>`<div class="pdf-flag">• <strong>${esc(c.c1)}</strong> ↔ <strong>${esc(c.c2)}</strong>: r = ${c.r}</div>`).join('') : `<div class="pdf-flag">No column pairs with |r| ≥ 0.6.</div>`;
+    const forecastBlock = S.forecast ? `<p>Trend for <strong>${esc(S.forecast.column)}</strong> is <strong>${S.forecast.direction}</strong> (slope ${fmtNum(S.forecast.slope)} per period).</p>` : `<p>No forecast was available.</p>`;
+
+    // Build chart images HTML from canvas captures
+    let chartSectionsHtml = '';
+    const chartCanvasHolders = document.querySelectorAll('.chart-canvas-holder canvas');
+    chartCanvasHolders.forEach((canvas, i) => {
+      if(canvas && typeof canvas.toDataURL === 'function'){
+        const dataUrl = canvas.toDataURL('image/png');
+        chartSectionsHtml += `<div class="pdf-section"><h3>${(S.chartConfigs[i] && S.chartConfigs[i].title) ? esc(S.chartConfigs[i].title) : ('Chart '+(i+1))}</h3><img src="${dataUrl}" style="width:100%; max-width:700px;" /></div>`;
+      }
+    });
+    const forecastCanvas = $('forecastCanvas');
+    if(forecastCanvas && S.forecast && typeof forecastCanvas.toDataURL === 'function'){
+      chartSectionsHtml += `<div class="pdf-section"><h3>${esc(S.forecast.column)} — Forecast</h3><img src="${forecastCanvas.toDataURL('image/png')}" style="width:100%; max-width:700px;" /></div>`;
+    }
+
+    const reportHtml = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+  body{font-family:Georgia,serif; max-width:700px; margin:0 auto; color:#1A1D26; background:#fff; padding:20px;}
+  h1{font-size:24px; border-bottom:2px solid #333; padding-bottom:8px; margin:0 0 4px;}
+  .report-meta{color:#666; font-family:monospace; font-size:11px; margin-bottom:18px;}
+  h2{margin-top:24px; border-bottom:1px solid #ddd; padding-bottom:5px; font-size:16px;}
+  table{width:100%; border-collapse:collapse; font-size:11px; margin:8px 0;}
+  td,th{padding:4px 8px; border-bottom:1px solid #eee; text-align:left;}
+  th{font-family:monospace; font-size:9px; text-transform:uppercase; color:#666;}
+  .pdf-flag{font-size:12px; padding:3px 0;}
+  .pdf-insight{border:1px solid #e0ddd3; border-radius:4px; padding:10px 12px; margin-bottom:8px; background:#faf9f6;}
+  .pdf-insight-text{font-size:13px; line-height:1.5; margin-bottom:4px;}
+  .pdf-insight-meta{font-size:10.5px; color:#666; font-family:monospace;}
+  .pdf-chip{font-family:monospace; font-size:10px; background:#edeae1; padding:1px 5px; border-radius:3px; color:#333;}
+  .pdf-section{margin:16px 0; page-break-inside:avoid;}
+  .pdf-section h3{font-size:14px; margin:0 0 6px;}
+  img{max-width:100%;}
+  .footer{text-align:center; color:#999; font-size:9px; margin-top:30px; border-top:1px solid #ddd; padding-top:8px;}
+  p{font-size:12.5px; line-height:1.5; margin:4px 0;}
+</style></head>
+<body>
+  <h1>Data Explainer Report</h1>
+  <div class="report-meta">${esc(S.fileName||'Dataset')} · ${S.rows.length.toLocaleString()} rows · ${S.headers.length} columns · generated ${new Date().toLocaleString()}</div>
+  <h2>Schema & Profile</h2>
+  <table><thead><tr><th>Column</th><th>Type</th><th>Nulls</th><th>Summary</th></tr></thead><tbody>${schemaRows}</tbody></table>
+  <h2>Data Quality</h2>${flagRows}
+  <h2>Insights</h2>${insightRows}
+  <h2>Anomalies & Correlations</h2>${anomalyRows}${corrRows}
+  <h2>Forecast</h2>${forecastBlock}
+  <h2>Charts</h2>${chartSectionsHtml || '<p>No charts were generated.</p>'}
+  <h2>PII Handling</h2><p>${S.piiSummary.redactedCount} value(s) pattern-matched and redacted across ${Object.keys(S.piiSummary.byColumn).length} column(s).</p>
+  <div class="footer">Generated by Data Explainer</div>
+</body></html>`;
+
+    // Create an offscreen iframe to render the report for html2canvas capture
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed; left:-9999px; top:0; width:800px; height:1px; border:none;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(reportHtml);
+    iframeDoc.close();
+
+    // Wait for iframe images (chart data URIs) to load
+    await new Promise(resolve => {
+      // Check if images are present; if not, just proceed
+      const imgs = iframeDoc.querySelectorAll('img');
+      if(imgs.length === 0){ resolve(); return; }
+      let loaded = 0;
+      imgs.forEach(img => {
+        if(img.complete){ loaded++; if(loaded === imgs.length) resolve(); }
+        else {
+          img.onload = () => { loaded++; if(loaded === imgs.length) resolve(); };
+          img.onerror = () => { loaded++; if(loaded === imgs.length) resolve(); };
+        }
+      });
+      setTimeout(resolve, 3000); // safety timeout
+    });
+
+    // Capture the iframe body in chunks using html2canvas — split by sections
+    const body = iframeDoc.body;
+    const sections = body.querySelectorAll('h2, .pdf-section');
+    let pageNum = 0;
+
+    // Helper: add page and capture a section
+    async function capturePage(element){
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: 700,
+        height: element.scrollHeight
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+      if(pageNum > 0) pdf.addPage();
+      // If image is taller than one page, split across multiple pages
+      let remainingHeight = imgHeight;
+      let yOffset = 0;
+      const pageUsableHeight = pageHeight - margin * 2;
+
+      while(remainingHeight > 0){
+        const sliceH = Math.min(remainingHeight, pageUsableHeight);
+        if(yOffset > 0) pdf.addPage();
+        // Crop the image to fit one page
+        const srcY = (yOffset / imgHeight) * canvas.height;
+        const srcH = (sliceH / imgHeight) * canvas.height;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = srcH;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+        const sliceData = tempCanvas.toDataURL('image/jpeg', 0.92);
+        const sliceImgH = (tempCanvas.height * contentWidth) / tempCanvas.width;
+        pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceImgH);
+        yOffset += sliceH;
+        remainingHeight -= sliceH;
+        pageNum++;
+      }
+    }
+
+    // Build a container with the full body content
+    const container = iframeDoc.createElement('div');
+    container.style.cssText = 'padding:20px;';
+
+    // Title section
+    const titleEl = body.querySelector('h1');
+    if(titleEl) container.appendChild(titleEl.cloneNode(true));
+    const metaEl = body.querySelector('.report-meta');
+    if(metaEl) container.appendChild(metaEl.cloneNode(true));
+
+    // Walk through all sections
+    const sectionElements = body.querySelectorAll('h2, .pdf-section');
+    sectionElements.forEach(el => {
+      container.appendChild(el.cloneNode(true));
+      // Also add any content between this h2 and the next h2
+      let next = el.nextElementSibling;
+      while(next && next.tagName !== 'H2' && !next.classList.contains('pdf-section')){
+        const clone = next.cloneNode(true);
+        container.appendChild(clone);
+        next = next.nextElementSibling;
+      }
+    });
+
+    // Also append the footer
+    const footer = body.querySelector('.footer');
+    if(footer) container.appendChild(footer.cloneNode(true));
+
+    iframeDoc.body.innerHTML = '';
+    iframeDoc.body.appendChild(container);
+
+    // Capture everything in one go — use a scrollHeight approach
+    const fullCaptureCanvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: 700,
+      height: container.scrollHeight
+    });
+
+    const fullImgData = fullCaptureCanvas.toDataURL('image/jpeg', 0.90);
+    const fullImgHeight = (fullCaptureCanvas.height * contentWidth) / fullCaptureCanvas.width;
+
+    // Split into pages
+    let remaining = fullImgHeight;
+    let yPos = 0;
+    const pageH = pageHeight - margin * 2;
+    let firstPage = true;
+
+    while(remaining > 0){
+      const sliceH = Math.min(remaining, pageH);
+      const srcY = (yPos / fullImgHeight) * fullCaptureCanvas.height;
+      const srcH = (sliceH / fullImgHeight) * fullCaptureCanvas.height;
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = fullCaptureCanvas.width;
+      tempCanvas.height = srcH;
+      const ctx = tempCanvas.getContext('2d');
+      ctx.drawImage(fullCaptureCanvas, 0, srcY, fullCaptureCanvas.width, srcH, 0, 0, fullCaptureCanvas.width, srcH);
+
+      const sliceData = tempCanvas.toDataURL('image/jpeg', 0.92);
+      const sliceImgH = (tempCanvas.height * contentWidth) / tempCanvas.width;
+
+      if(!firstPage) pdf.addPage();
+      pdf.addImage(sliceData, 'JPEG', margin, margin, contentWidth, sliceImgH);
+
+      yPos += sliceH;
+      remaining -= sliceH;
+      firstPage = false;
+    }
+
+    // Clean up
+    document.body.removeChild(iframe);
+
+    // Save the PDF
+    pdf.save(`data-explainer-report-${(S.fileName||'dataset').replace(/\.[^.]+$/,'')}.pdf`);
+    logAudit('Export', 'PDF report generated with all insights and charts via html2canvas + jsPDF');
+  } catch(e){
+    console.error('PDF export error:', e);
+    // Fallback: download as HTML
+    const fallbackHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Data Explainer Report — ${esc(S.fileName)}</title>
+    <style>body{font-family:Georgia,serif; max-width:760px; margin:40px auto; color:#1A1D26; padding:0 20px;}
+    h1{font-family:Georgia,serif;} h2{margin-top:32px; border-bottom:1px solid #ddd; padding-bottom:6px;}
+    table{width:100%; border-collapse:collapse; font-size:13px;} td,th{padding:6px 10px; border-bottom:1px solid #eee; text-align:left;}
+    .r-flag{font-size:14px; padding:4px 0;} .r-chip{font-family:monospace; font-size:12px; background:#f0efe9; padding:2px 6px; border-radius:3px;}
+    .report-meta{color:#666; font-family:monospace; font-size:12px; margin-bottom:20px;}</style></head>
+    <body>${buildReportHTML()}</body></html>`;
+    const blob = new Blob([fallbackHtml], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `data-explainer-report-${(S.fileName||'dataset').replace(/\.[^.]+$/,'')}.html`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  btn.textContent = origText;
+  btn.disabled = false;
+}
+
+$('exportBtn').addEventListener('click', exportPdf);
+$('closeReportBtn').addEventListener('click', closeReport);
+$('reportOverlay').addEventListener('click', e=>{ if(e.target.id==='reportOverlay') closeReport(); });
+
+$('downloadReportBtn').addEventListener('click', ()=>{
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Data Explainer Report — ${esc(S.fileName)}</title>
+  <style>body{font-family:Georgia,serif; max-width:760px; margin:40px auto; color:#1A1D26; padding:0 20px;}
+  h1{font-family:Georgia,serif;} h2{margin-top:32px; border-bottom:1px solid #ddd; padding-bottom:6px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;} td,th{padding:6px 10px; border-bottom:1px solid #eee; text-align:left;}
+  .r-flag{font-size:14px; padding:4px 0;} .r-chip{font-family:monospace; font-size:12px; background:#f0efe9; padding:2px 6px; border-radius:3px;}
+  .report-meta{color:#666; font-family:monospace; font-size:12px; margin-bottom:20px;}</style></head>
+  <body>${buildReportHTML()}</body></html>`;
+  const blob = new Blob([fullHtml], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `data-explainer-report-${(S.fileName||'dataset').replace(/\.[^.]+$/,'')}.html`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  logAudit('Export', 'report downloaded as standalone HTML');
+});
+
+$('copyReportBtn').addEventListener('click', async ()=>{
+  const text = buildReportPlainText();
+  const btn = $('copyReportBtn');
+  try{
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied ✓';
+  }catch(e){
+    // clipboard API can also be permission-gated in a sandboxed iframe; fall back to a selectable textarea
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText='position:fixed; top:-9999px;';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); btn.textContent='Copied ✓'; }
+    catch(e2){ btn.textContent='Select text below to copy'; $('reportSheet').insertAdjacentHTML('afterbegin', `<textarea readonly style="width:100%; height:160px; margin-bottom:16px; font-family:monospace; font-size:11px;">${esc(text)}</textarea>`); }
+    ta.remove();
+  }
+  setTimeout(()=>{ btn.textContent='Copy as text'; }, 2000);
+});
+$('newFileBtn').addEventListener('click', ()=>{ $('shell').classList.remove('active'); $('heroView').style.display='block'; $('fileInput').value=''; });
+
+// Chat wiring
+$('chatSendBtn').addEventListener('click', chatSend);
+$('chatInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); chatSend(); }
+});
+$('chatInput').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+})();
+</script>
+</body>
+</html>
