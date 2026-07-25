@@ -263,21 +263,6 @@ npm run dev
 
 ---
 
-# 🎥 Demo
-
-> Add your screenshots and demo GIFs here.
-
-```
-Dashboard Screenshot
-
-Upload Screen
-
-Charts
-
-AI Insights
-
-Chat With Data
-```
 
 ---
 
